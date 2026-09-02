@@ -332,7 +332,7 @@ class TestGetCmdTime:
         response = response_factory(status_code=200, json_data={'result': ['SAMPLE', 'ECHO', 1000, 500000]})
         post_mock = mocker.patch('ing_lib_cosmos.cosmos.requests.post', return_value=response)
 
-        result = client.get_cmd_time('HANDLE', 'ECHO')
+        result = client.get_cmd_time('SAMPLE', 'ECHO')
 
         payload = post_mock.call_args.kwargs['json']
         assert payload['params'] == ['SAMPLE', 'ECHO']
@@ -389,7 +389,7 @@ class TestGetCmdCnt:
 
         result = client.get_cmd_cnt('SAMPLE', 'ECHO')
 
-        payload = post_mock.call_args.SAMPLE['json']
+        payload = post_mock.call_args.kwargs['json']
         assert payload['params'] == ['SAMPLE', 'ECHO']
         assert result == {'target_name': 'SAMPLE', 'command_name': 'ECHO', 'count': 5}
 
