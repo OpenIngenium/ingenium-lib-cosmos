@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<custom-scripts>
+    <header mission_name="COSMOS" />
+    <custom_script description="This step will halt alll running scripts on a COSMOS server." hash="" script_id="" script_name="halt_all_script" script_path="halt_all_script.py" is_command="true">
+        <output_array description="Scripts Halted " name="halted" max_entries="20">
+            <output_array_field name="script_id" description="Script ID" type="INT"></output_array_field>
+            <output_array_field name="state" description="State of Script (prior to halt)" type="STRING"></output_array_field>
+            <output_array_field name="filename" description="Filename/Path of script" type="STRING"></output_array_field>
+            <output_array_field name="line_no" description="Current Line of Script (prior to halt)" type="INT"></output_array_field>
+            <output_array_field name="start_time" description="Time script was started" type="STRING"></output_array_field>
+            <output_array_field name="last_updated" description="Time script was stopped" type="STRING"></output_array_field>
+        </output_array>
+        <advanced_layout>
+            <section>
+                <section_results>
+                    <table table_name="halted">
+                        <label label_content="Scripts Halted (max of 20)" label_loc="TOP" label_align="CENTER"></label>
+                        <table_field width="1" column_label="Script_ID">
+                            <template template="{script_id"></template>
+                        </table_field>
+                        <table_field width="1" column_label="Script State">
+                            <template template="{state}"></template>
+                        </table_field>
+                        <table_field width="5" column_label="Filename/Path">
+                            <template template="{filename}"></template>
+                        </table_field>
+                        <table_field width="1" column_label="Line Number">
+                            <template template="{line_no}"></template>
+                        </table_field>
+                        <table_field width="2" column_label="Script Start Time">
+                            <template template="{start_time}"></template>
+                        </table_field>                        
+                        <table_field width="2" column_label="Script Last Update Time">
+                            <template template="{last_updated}"></template>
+                        </table_field>
+                    </table>
+                </section_results>
+            </section>
+        </advanced_layout>
+    </custom_script>
+</custom-scripts>
