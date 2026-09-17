@@ -13,10 +13,11 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEND_COMMAND_DIR = os.path.join(REPO_ROOT, 'steps', 'send_command')
 RUN_SCRIPT_DIR = os.path.join(REPO_ROOT, 'steps', 'run_script')
 HALT_ALL_SCRIPTS_DIR = os.path.join(REPO_ROOT, 'steps', 'halt_all_scripts')
+QUERY_TELEM_DIR = os.path.join(REPO_ROOT, 'steps', 'query_telem')
 
-# Required so `import send_command` / `import run_script` / `import halt_all_scripts`
-# work in their respective test modules
-for _step_dir in (SEND_COMMAND_DIR, RUN_SCRIPT_DIR, HALT_ALL_SCRIPTS_DIR):
+# Required so `import send_command` / `import run_script` / `import halt_all_scripts` /
+# `import query_telem` work in their respective test modules
+for _step_dir in (SEND_COMMAND_DIR, RUN_SCRIPT_DIR, HALT_ALL_SCRIPTS_DIR, QUERY_TELEM_DIR):
     if _step_dir not in sys.path:
         sys.path.insert(0, _step_dir)
 
