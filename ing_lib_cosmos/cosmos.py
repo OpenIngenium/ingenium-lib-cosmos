@@ -4,12 +4,15 @@ Handles token generation and refresh for OpenC3 COSMOS
 """
 
 import os
+from urllib.parse import uses_query
+
 import urllib3
 from typing import Tuple, Optional, Callable, List
 import requests
 import time
 import traceback
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from ing_lib.logs import get_logger
 logger = get_logger(__name__)
@@ -762,6 +765,7 @@ class CosmosAPIClient:
         response = self._authed_request(requests.post, url, timeout, json=json_rpc_payload, headers=self.headers,
                                          verify=self.verify_ssl)
 
+        logger.debug(f"Response status: {response.text}")
         if response.status_code != 200:
             rpc_message = _extract_jsonrpc_error_message(response.text)
             error_msg = f"COSMOS API returned status {response.status_code}"
@@ -774,6 +778,7 @@ class CosmosAPIClient:
         values = _parse_jsonrpc(response, 'Telemetry query failed')
         result = dict(zip(tlm_points, values))
         logger.info(f"Retrieved telemetry for {len(tlm_points)} point(s)")
+        logger.debug(f"Retrieved telemetry: {tlm_points}")
         return result
 
     def query_telemetry(self, items: List[List[str]], start_time: str = None, end_time: str = None,
@@ -1311,4 +1316,247 @@ class CosmosAPIClient:
         # Script executed and completed - success
         logger.info(f"Script {script_id} completed (no longer in running list)")
         return {'script_id': script_id, 'state': 'completed', 'running': False}
+
+
+#################################################### Telemetry Verification Helpers ####################################################
+# These helpers bridge CosmosAPIClient.get_telemetry() (which returns bare scalar
+# values keyed by OpenC3 tlm string) with ing_lib.steps.verify_wait_telemetry()
+# (which expects a telemetry_query_func returning {'channels': {channel: [{dn, eu,
+# channelType, status}, ...]}} and a query dict keyed by channel name).
+
+CHANNEL_NAME_DELIMITER = '__'
+
+# Supported dn_eu representations for telemetry queries
+VALID_DN_EU = ('DN', 'EU')
+
+
+def validate_dn_eu(telem_name: str, dn_eu: str, seen_dn_eu: Dict[str, str]) -> None:
+    """
+    Validate that a telemetry query's dn_eu is 'DN' or 'EU', and that it is
+    consistent with any prior dn_eu seen for the same telem_name within the
+    same request. Mutates `seen_dn_eu` in place to record telem_name -> dn_eu.
+
+    Args:
+        telem_name: The telemetry channel name being queried
+        dn_eu: The requested representation, expected to be 'DN' or 'EU'
+        seen_dn_eu: Mapping of telem_name -> dn_eu already validated in this
+            request; used to detect conflicting dn_eu values for the same
+            telem_name
+
+    Raises:
+        ValueError: If dn_eu is not one of VALID_DN_EU, or if telem_name was
+            already seen in this request with a different dn_eu value
+    """
+    if dn_eu not in VALID_DN_EU:
+        raise ValueError(f"Invalid dn_eu value: {dn_eu!r}. Expected one of {VALID_DN_EU}.")
+
+    existing = seen_dn_eu.get(telem_name)
+    if existing is not None and existing != dn_eu:
+        raise ValueError(
+            f"Conflicting dn_eu for telem_name {telem_name!r}: "
+            f"already requested as {existing!r}, now requested as {dn_eu!r}."
+        )
+
+    seen_dn_eu[telem_name] = dn_eu
+
+
+def split_channel_name(channel_name: str) -> Tuple[str, str, str]:
+    """
+    Split a channel_name of the form "{target}__{packet}__{tlm_point}" into its
+    (target, packet, tlm_point) components.
+
+    Args:
+        channel_name: e.g. "MIRA__PRIM/DEFAULTBEACON__ROCKET_STATE.CURRENT_STATE"
+
+    Returns:
+        (target, packet, tlm_point)
+
+    Raises:
+        ValueError: If channel_name does not contain exactly two '__' delimiters
+    """
+    parts = channel_name.split(CHANNEL_NAME_DELIMITER)
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid channel_name: {channel_name!r}. Expected format "
+            f"'{{target}}{CHANNEL_NAME_DELIMITER}{{packet}}{CHANNEL_NAME_DELIMITER}{{tlm_point}}'"
+        )
+    target, packet, tlm_point = parts
+    return target, packet, tlm_point
+
+
+def build_query_dict(entry_inputs: Dict[str, Any], prior_value: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
+    """
+    Build a single-channel query dict for ing_lib.steps.verify_wait_telemetry()
+    from a query_telem.py entry's entry_inputs.
+
+    Args:
+        entry_inputs: Dict containing 'channel_name', 'verify_wait', 'dn_eu',
+            'verification_condition', 'verification_values', and optionally
+            'bit_mask'/'bit_op'
+        prior_value: Prior value to diff against (only meaningful when the
+            entry's verify_on == 'CHANGE'); omitted from the predict when None
+
+    Returns:
+        A dict of the form {channel_name: {predict}} ready to pass as the
+        `query` argument to verify_wait_telemetry()
+    """
+
+    predict = {
+        'telem_uuid' : entry_inputs['telem_name'],
+        'verify_wait': entry_inputs['verify_wait'],
+        'dn_eu': entry_inputs['dn_eu'],
+        'verification_condition': entry_inputs['verification_condition'],
+        'verification_values': entry_inputs.get('verification_values', []),
+    }
+
+    if entry_inputs.get('bit_mask') is not None:
+        predict['bit_mask'] = entry_inputs['bit_mask']
+    if entry_inputs.get('bit_op') is not None:
+        predict['bit_op'] = entry_inputs['bit_op']
+    if prior_value is not None:
+        predict['prior_value'] = prior_value
+
+    return predict
+
+
+def build_query_telemetry_item(target: str, packet: str, tlm_point: str, dn_eu: str) -> str:
+    """
+    Build the OpenC3 telemetry item string used with CosmosAPIClient.query_telemetry(),
+    selecting the raw (DN) or converted (EU) representation.
+
+    Args:
+        target: Target name
+        packet: Packet name
+        tlm_point: Telemetry item name
+        dn_eu: 'DN' (raw) or 'EU' (converted)
+
+    Returns:
+        The item string, e.g. "MIRA PRIM/DEFAULTBEACON ROCKET_STATE.CURRENT_STATE__RAW"
+        for DN, or "...__CONVERTED" for EU.
+
+    Raises:
+        ValueError: If dn_eu is not 'DN' or 'EU'
+    """
+    if dn_eu == 'DN':
+        suffix = '__RAW'
+    elif dn_eu == 'EU':
+        suffix = '__CONVERTED'
+    else:
+        raise ValueError(f"Invalid dn_eu value: {dn_eu!r}. Expected 'DN' or 'EU'.")
+
+    return f"{target}__{packet}__{tlm_point}{suffix}"
+
+
+def build_packet_timeformatted_item(target: str, packet: str) -> str:
+    """
+    Build the OpenC3 telemetry item string for a packet's PACKET_TIMEFORMATTED
+    point, in the same format as other telemtry is provided, to source the timestamp
+    for every telemetry item logged within that packet.
+
+    Args:
+        target: Target name
+        packet: Packet name
+
+    Returns:
+        The item string, e.g. "MIRA__PRIM/DEFAULTBEACON__PACKET_TIMEFORMATTED__RAW"
+    """
+    return f"{target}__{packet}__PACKET_TIMEFORMATTED__RAW"
+
+
+def strip_suffix(name):
+    for suffix in ("__RAW", "__CONVERTED"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def cosmos_telemetry_query_func(client: 'CosmosAPIClient', entry_map: Dict[str, str]) -> Callable:
+    """
+    Build a telemetry_query_func compatible with ing_lib.steps.verify_wait_telemetry(),
+    backed by CosmosAPIClient.query_telemetry().
+
+    This adapter queries COSMOS's historical `query_telemetry` API, which
+    returns - per requested item, in request order -
+    the full series of samples logged within [start_time, now]. For each unique
+    (target, packet) pair among the requested channels, a PACKET_TIMEFORMATTED
+    item is also queried so every sample can be timestamped; each channel's value
+    series is zipped positionally against its packet's timestamp series, sorted
+    ascending by time, and returned as a list of channel objects (oldest first,
+    so the last element - as expected by evaluate_verify_condition - is the most
+    recent measurement).
+
+    Args:
+        client: CosmosAPIClient instance
+        entry_map: Mapping of channel_name -> dn_eu ('DN' or 'EU') for every
+            channel that may be queried through this function
+
+    Returns:
+        A callable with signature (channels, timeout, lookback, start_time, return_on)
+        as expected by verify_wait_telemetry. `timeout` is used both as the HTTP
+        request timeout and to compute the end of the historical window
+        (start_time + timeout seconds); `start_time` is passed through to
+        query_telemetry as the start of the historical window; `lookback`/`return_on`
+        are accepted for interface compatibility but ignored.
+    """
+    def telemetry_query_func(telemetry: List[str], timeout: int, lookback: int,
+                              start_time: Any, return_on: Any) -> Dict[str, Any]:
+
+        unique_packets = []
+        telemetry_to_query = []
+
+        for telemetry_name in telemetry:
+            dn_eu = entry_map[telemetry_name]
+            target, packet, tlm_point = split_channel_name(telemetry_name)
+            telemetry_query_name = build_query_telemetry_item(target, packet, tlm_point, dn_eu)
+            telemetry_to_query.append(telemetry_query_name)
+            packet_name = f'{target}{CHANNEL_NAME_DELIMITER}{packet}'
+            if packet_name not in unique_packets:
+                unique_packets.append(packet_name)
+                packet_time_channel = build_packet_timeformatted_item(target, packet)
+                telemetry_to_query.append(packet_time_channel)
+
+        # if no start time is provided, use current time
+        if not hasattr(start_time, 'isoformat'):
+            start_time = datetime.now(timezone.utc)
+
+        # compute query window
+        query_start = start_time - timedelta(seconds=lookback)
+        query_end = start_time + timedelta(seconds=timeout)
+        start_time_str = query_start.replace(microsecond=0).isoformat().replace('+00:00', '')
+        end_time_str = query_end.replace(microsecond=0).isoformat().replace('+00:00', '')
+
+        try:
+            series = client.query_telemetry(telemetry_to_query, start_time=start_time_str, end_time=end_time_str,
+                                            timeout=timeout)
+        except IngeniumCosmosError as e:
+            logger.error(f"Telemetry query failed for telemetry {telemetry_to_query}: {e}")
+
+        telemetry_results = {}
+
+        for data in series:
+            for item, values in zip(telemetry_to_query, data):
+                if not telemetry_results.get(item):
+                    telemetry_results[item]=[]
+                telemetry_results[item].append(values[0])
+
+        results = {}
+
+        for packet in unique_packets:
+            packet_time_channel = f"{packet}__PACKET_TIMEFORMATTED__RAW"
+
+            for telemetry in telemetry_results:
+                if packet in telemetry:
+                    if telemetry != packet_time_channel:
+                        if entry_map[strip_suffix(telemetry)] == 'DN':
+                            value_type = 'raw_value'
+                        elif entry_map[strip_suffix(telemetry)] == 'EU':
+                            value_type = 'eng_value'
+                        time_value_pairs = sorted(
+                            zip(telemetry_results[packet_time_channel], telemetry_results[telemetry]),
+                            key=lambda pair: pair[0]
+                        )
+                        results[strip_suffix(telemetry)] = [{'time': t, value_type: v} for t, v in time_value_pairs]
+        return results
+
+    return telemetry_query_func
 
