@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<custom-scripts>
+    <header mission_name="COSMOS"/>
+    <custom_script description="This script checks telemetry values from COSMOS and compares them against predicted values, reporting PASS if values match or FAIL if they do not." hash="" script_id="" script_name="cosmos_check_tlm" script_path="cosmos_check_tlm.py" is_command="false">
+        <input_field name="start_time" description="The start time to query against (if none is provided the script will use the current time)." phase="AUTHORING" required="YES" type="TIME"></input_field>
+        <input_field name="timeout" description="This, along with the start time, determines the time range to look for the telemetry value" phase="AUTHORING" required="YES" type="INT"></input_field>
+        <input_field name="lookback" description="A negative offset on the start time to use in the query." phase="AUTHORING" required="YES" type="INT" default="0"></input_field>
+        <script_entry>
+            <input_field description="The COSMOS target name" name="target" phase="AUTHORING" required="YES" type="STRING"/>
+            <input_field description="The COSMOS packet name" name="packet" phase="AUTHORING" required="YES" type="STRING"/>
+            <input_field description="The telemetry point name within the packet" name="tlm_point" phase="AUTHORING" required="YES" type="STRING"/>
+            <input_field description="The predicted/expected value for the telemetry point" name="predicted_value" phase="AUTHORING" required="YES" type="STRING"/>
+            <input_field description="Optional tolerance for numeric comparisons (absolute difference allowed)" name="tolerance" phase="AUTHORING" required="NO" type="STRING"/>
+            <output_field description="The actual telemetry value retrieved from COSMOS" name="actual_value" type="STRING"/>
+            <output_field description="The timestamp when the telemetry value was retrieved" name="time_stamp" type="STRING"/>
+        </script_entry>
+    </custom_script>
+</custom-scripts>
