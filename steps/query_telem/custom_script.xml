@@ -5,14 +5,96 @@
         <input_field name="start_time" description="The start time to query against (if none is provided the script will use the current time)." phase="AUTHORING" required="YES" type="TIME"></input_field>
         <input_field name="timeout" description="This, along with the start time, determines the time range to look for the telemetry value" phase="AUTHORING" required="YES" type="INT"></input_field>
         <input_field name="lookback" description="A negative offset on the start time to use in the query." phase="AUTHORING" required="YES" type="INT" default="0"></input_field>
+
         <script_entry>
-            <input_field description="The COSMOS target name" name="target" phase="AUTHORING" required="YES" type="STRING"/>
-            <input_field description="The COSMOS packet name" name="packet" phase="AUTHORING" required="YES" type="STRING"/>
-            <input_field description="The telemetry point name within the packet" name="tlm_point" phase="AUTHORING" required="YES" type="STRING"/>
-            <input_field description="The predicted/expected value for the telemetry point" name="predicted_value" phase="AUTHORING" required="YES" type="STRING"/>
-            <input_field description="Optional tolerance for numeric comparisons (absolute difference allowed)" name="tolerance" phase="AUTHORING" required="NO" type="STRING"/>
+            <input_field description="The telemetry name in format of <TARGET>__<PACKET>__<TELEMPOINT>" name="telem_name" phase="AUTHORING" required="YES" type="FLIGHT_TELEM"/>
+            <input_field description="Check the first telemetry available (verify) or wait for values that match predict (wait)" name="verify_wait" phase="AUTHORING" required="YES" type="ENUM">
+                    <enum symbolic="WAIT"></enum>
+                    <enum symbolic="VERIFY"></enum>
+            </input_field>
+            <input_field description="Check the value received (Value) or the delta from the last time Ingenium has evaluated this telemetry (Change)" name="verify_on" phase="AUTHORING" required="YES" type="ENUM">
+                    <enum symbolic="CHANGE"></enum>
+                    <enum symbolic="VALUE"></enum>
+            </input_field>
+            <input_field description="Evaluate the engineering unit (EU) or raw value (DN)." name="dn_eu" phase="AUTHORING" required="YES" type="ENUM">
+                    <enum symbolic="DN"></enum>
+                    <enum symbolic="EU"></enum>
+            </input_field>
+            <input_field description="How to evaluate this telemetry" name="verification_condition" phase="AUTHORING" required="YES" type="VERIFICATION_COND"/>
+            <input_field description="Bitmask (either using hex, binary, or decimal)" name="bitmask" phase="AUTHORING" required="NO" type="STRING"/>
+            <input_field description="Bitmask (either using hex, binary, or decimal)" name="bit_op" phase="AUTHORING" required="NO" type="ENUM">
+                    <enum symbolic="AND"></enum>
+                    <enum symbolic="OR"></enum>
+            </input_field>
             <output_field description="The actual telemetry value retrieved from COSMOS" name="actual_value" type="STRING"/>
-            <output_field description="The timestamp when the telemetry value was retrieved" name="time_stamp" type="STRING"/>
+            <output_field description="The timestamp when the telemetry value was retrieved" name="telem_time" type="STRING"/>
         </script_entry>
+        <output_field description="Start time (in DOY format) of the reference time" name="start_time_date_time" type="STRING"/>
+        <output_field description="Start time (in DOY format) of the query" name="query_start" type="STRING"/>
+        <output_field description="End time (in DOY format) of the query" name="query_end" type="STRING"/>
+        <advanced_layout>
+            <section>
+                <section_header>
+                    <layout_display>
+                        <template template="Querying Telemetry starting: {start_time} with lookback: {lookback} and timeout: {timeout}."></template>
+                        <mouseover_display>
+                            <mouseover_element field_name="start_time_date_time" display_name="Start Time"></mouseover_element>
+                            <mouseover_element field_name="query_start" display_name="Query Start"></mouseover_element>
+                            <mouseover_element field_name="query_end" display_name="Query End"></mouseover_element>
+                        </mouseover_display>
+                        <layout row="1" column="1" width="8" height="1" align="LEFT"></layout>
+                    </layout_display>
+                </section_header>
+            </section>
+            <entry_section>
+                <section_header>
+                    <layout_display>
+                        <template template="Query for: {telem_name} and check "></template>
+                        <layout row="1" column="1" width="6" height="1" align="LEFT"></layout>
+                    </layout_display>
+                    <layout_display>
+                        <template template="Query for: {telem_name} and check "></template>
+                        <layout row="1" column="1" width="6" height="1" align="LEFT"></layout>
+                    </layout_display>
+                    <icon icon_type="STATUS">
+                        <mouseover_display>
+                            <mouseover_element field_name="actual_value" display_name="Actual Value"></mouseover_element>
+                            <mouseover_element field_name="telem_time" display_name="Time of Measurement"></mouseover_element>
+                        </mouseover_display>
+                        <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
+                    </icon>
+                </section_header>
+                <section_content>
+                    <layout_field> field_name="telem_name">
+                        <label label_content="Telemetry" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="1" column="7" width="3" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="verify_wait">
+                        <label label_content="Verify or Wait?" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="2" column="1" width="3" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="verify_on">
+                        <label label_content="Verify On?" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="2" column="4" width="3" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="dn_eu">
+                        <label label_content="DN or EU?" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="2" column="8" width="3" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="verification_condition">
+                        <label label_content="Verification Condition" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="3" column="1" width="8" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="bit_op">
+                        <label label_content="Bit Operation" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="4" column="1" width="2" height="1" align="LEFT"></layout>
+                    </layout_field>
+                    <layout_field> field_name="bitmask">
+                        <label label_content="Bitmask" label_loc="LEFT" label_align="CENTER"></label>
+                        <layout row="4" column="3" width="3" height="1" align="LEFT"></layout>
+                    </layout_field>
+                </section_content>
+            </entry_section>
+        </advanced_layout>
     </custom_script>
 </custom-scripts>
