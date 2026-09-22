@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <custom-scripts>
     <header mission_name="COSMOS" />
-    <custom_script description="This step will halt alll running scripts on a COSMOS server." hash="" script_id="" script_name="halt_all_script" script_path="halt_all_script.py" is_command="true">
+    <custom_script description="This step will halt all running scripts on a COSMOS server." hash="" script_id="" script_name="halt_all_script" script_path="halt_all_script.py" is_command="true">
         <output_array description="Scripts Halted " name="halted" max_entries="20">
             <output_array_field name="script_id" description="Script ID" type="INT"></output_array_field>
             <output_array_field name="state" description="State of Script (prior to halt)" type="STRING"></output_array_field>
