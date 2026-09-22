@@ -37,7 +37,7 @@
                     </layout_field>
                     <layout_field field_name="cmd_check" tool_tip="Enable or Disable Command Checking in Cosmos">
                         <label label_content="Check Command?" label_loc="TOP" label_align="LEFT"></label>
-                        <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
+                        <layout row="1" column="11" width="2" height="1" align="RIGHT"></layout>
                     </layout_field>
                 </section_content>
             </entry_section>
