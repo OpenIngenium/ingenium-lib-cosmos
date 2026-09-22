@@ -52,11 +52,11 @@
                     </layout_field>
                     <layout_field field_name="wait_for_completion">
                         <label label_content="Wait for Complete?" label_loc="TOP" label_align="CENTER"></label>
-                        <layout row="1" column="9" width="1" height="1" align="CENTER"></layout>
+                        <layout row="1" column="9" width="2" height="1" align="CENTER"></layout>
                     </layout_field>
                     <layout_field field_name="timeout">
                         <label label_content="Timeout (s)" label_loc="TOP" label_align="CENTER"></label>
-                        <layout row="1" column="10" width="2" height="1" align="RIGHT"></layout>
+                        <layout row="1" column="11" width="2" height="1" align="RIGHT"></layout>
                     </layout_field>
                 </section_content>
             </entry_section>
