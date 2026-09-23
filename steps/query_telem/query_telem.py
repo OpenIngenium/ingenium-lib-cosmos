@@ -36,7 +36,8 @@ def parse_start_time(start_time_raw):
     Parameters
     ----------
     start_time_raw
-        None, or an ISO 8601 formatted string (optionally with a trailing 'Z')
+        None, or a DOY timestamp in ``YYYY-DDDTHH:MM:SS`` format
+        (for example, ``2026-266T21:24:01``)
 
     Returns
     -------
@@ -50,13 +51,8 @@ def parse_start_time(start_time_raw):
         return None
 
     try:
-        normalized = start_time_raw
-        if normalized.endswith('Z'):
-            normalized = normalized[:-1] + '+00:00'
-        parsed = datetime.fromisoformat(normalized)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed
+        parsed = datetime.strptime(start_time_raw, '%Y-%jT%H:%M:%S')
+        return parsed.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError, AttributeError) as e:
         msg = f"Unable to parse start_time '{start_time_raw}': {e}"
         logger.error(msg)

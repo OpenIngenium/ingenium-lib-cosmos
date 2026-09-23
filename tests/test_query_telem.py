@@ -304,10 +304,10 @@ class TestMain:
         assert verify_mock.call_args.kwargs['lookback'] == 10
         assert verify_mock.call_args.kwargs['start_time'] is None
 
-    def test_start_time_iso_string_is_parsed(self, mocker, mock_io):
+    def test_start_time_doy_string_is_parsed(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [make_entry(telem_name=telem_name)],
-                  inputs={'start_time': '2026-01-01T00:00:00Z', 'timeout': 60, 'lookback': 0})
+                  inputs={'start_time': '2026-266T21:24:01', 'timeout': 60, 'lookback': 0})
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
             query_telem, 'verify_wait_telemetry',
@@ -321,6 +321,10 @@ class TestMain:
         start_time = verify_mock.call_args.kwargs['start_time']
         assert start_time is not None
         assert start_time.year == 2026
+        assert start_time.timetuple().tm_yday == 266
+        assert start_time.hour == 21
+        assert start_time.minute == 24
+        assert start_time.second == 1
         assert start_time.tzinfo is not None
 
     def test_invalid_start_time_marks_all_entries_error(self, mocker, mock_io):
