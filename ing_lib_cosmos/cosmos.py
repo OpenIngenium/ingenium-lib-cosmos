@@ -1423,10 +1423,11 @@ def build_query_dict(entry_inputs: Dict[str, Any], prior_value: Optional[float] 
         'verification_values': entry_inputs.get('verification_values', []),
     }
 
-    if entry_inputs.get('bit_mask') is not None:
-        predict['bit_mask'] = entry_inputs['bit_mask']
-    if entry_inputs.get('bit_op') is not None:
-        predict['bit_op'] = entry_inputs['bit_op']
+    bit_op = entry_inputs.get('bit_op')
+    if bit_op not in (None, 'NONE'):
+        if entry_inputs.get('bit_mask') is not None:
+            predict['bit_mask'] = entry_inputs['bit_mask']
+        predict['bit_op'] = bit_op
     if prior_value is not None:
         predict['prior_value'] = prior_value
 
