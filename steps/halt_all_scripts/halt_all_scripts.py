@@ -20,7 +20,7 @@ from ing_lib_cosmos.cosmos import CosmosAPIClient, IngeniumCosmosError
 def main():
     """Main execution function"""
     # Load custom script input/output paths
-    error_msg = 'USAGE: ./run_script.py input_file_path output_file_path'
+    error_msg = 'USAGE: ./halt_all_scripts.py input_file_path output_file_path'
     input_file_abs_path, output_file_abs_path = get_input_output_paths(error_msg)
 
     logger.info(f'input_file_abs_path: {input_file_abs_path}')
@@ -109,7 +109,7 @@ def main():
             logger.warning(f'Failed to halt script: {script_filename} (ID: {script_id})')
 
         script_information = {
-            'halted': halt_success,
+            'script_halted': halt_success,
             'script_id': script_id, 
             'state': script_state,
             'filename': script_filename,
@@ -126,7 +126,7 @@ def main():
     # Determine overall status
     custom_script_status = 'PASS'
     for script in scripts_halted:
-        if not script.get('halted'):
+        if not script.get('script_halted'):
             custom_script_status = 'FAIL'
             break
 
