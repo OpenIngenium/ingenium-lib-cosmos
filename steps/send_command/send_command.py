@@ -34,6 +34,7 @@ def process_command_entry(client, entry):
     3. Checks the command count and time of dispatch (with a small delay)
     """
 
+    logger.debug(f'Command String (pre-process): {entry["entry_inputs"].get("command_string")}')
     cmd_tgt = entry['entry_inputs'].get('command_string', '').split('__')[0]
     cmd_cmd = entry['entry_inputs'].get('command_string', '').split('__')[1].split('with')[0].strip()
     command_string = f'{cmd_tgt} {cmd_cmd}'
@@ -50,7 +51,7 @@ def process_command_entry(client, entry):
 
         # Added a slight delay between the command dispatch and the cmd_cnt/cmd_time checks
         # This was done due to a possible race condition where the cmd_cnt/cmd_time checks
-        # were happening before the command was fully processed (and Comsos was returning 0)
+        # were happening before the command was fully processed (and COSMOS was returning 0)
         time.sleep(.25)
 
         cmd_count = client.get_cmd_cnt(cmd_tgt, cmd_cmd)
@@ -134,7 +135,7 @@ def main():
         process_command_entry(client, entry)
 
         logger.debug(f'Entry {i+1} processed: {entry}')
-        
+
         # Build summary
         output_summary += f"Sent Command {entry['entry_inputs'].get('command_string')} with status of {entry.get('verification_status')}\n"
         output_dict['output_summary'] = output_summary
