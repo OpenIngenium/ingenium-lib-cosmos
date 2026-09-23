@@ -5,6 +5,8 @@ Tests for steps/run_script/run_script.py
 CosmosAPIClient; those dependencies are mocked here so tests focus on the
 step's control flow and use of ing_lib_cosmos.cosmos's exception-based API.
 """
+import copy
+
 import pytest
 
 import run_script
@@ -69,6 +71,8 @@ class TestMain:
 
     def test_wait_for_completion_success_marks_pass(self, mocker, mock_io):
         set_input(mocker, [make_entry(wait_for_completion=True)])
+        snapshots = []
+        mock_io.side_effect = lambda output, _: snapshots.append(copy.deepcopy(output))
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 42, 'running': True}
         client.monitor_script.return_value = iter([
@@ -85,6 +89,16 @@ class TestMain:
         assert entry['verification_status'] == 'PASS'
         assert entry['entry_outputs']['timeout_remaining'] == 3
         assert output['custom_script_status'] == 'PASS'
+
+        updates = [
+            snapshot['entries'][0]['entry_outputs']['timeout_remaining']
+            for snapshot in snapshots
+            if snapshot['entries'][0]['entry_outputs'].get('timeout_remaining') is not None
+        ]
+        assert any(
+            previous == 5 and current == 3
+            for previous, current in zip(updates, updates[1:])
+        )
 
     def test_wait_for_completion_failure_marks_fail(self, mocker, mock_io):
         set_input(mocker, [make_entry(wait_for_completion=True)])
@@ -135,6 +149,7 @@ class TestMain:
         output = last_output_dict(mock_io)
         entry = output['entries'][0]
         assert entry['verification_status'] == 'PASS'
+        assert entry['entry_outputs']['timeout_remaining'] == 5
         assert output['custom_script_status'] == 'PASS'
 
     def test_no_wait_not_found_marks_fail(self, mocker, mock_io):

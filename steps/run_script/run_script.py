@@ -90,7 +90,8 @@ def main():
 
         entry['entry_outputs'] = {
             'running': running,
-            'script_id': script_id
+            'script_id': script_id,
+            'timeout_remaining': timeout
         }
 
         logger.info(f"Script started: {script_id}")
@@ -157,6 +158,7 @@ def main():
                 'script_id': script_id,
                 'running': result.get('running', False),
                 'state': result.get('state', ''),
+                'timeout_remaining': result.get('timeout_remaining', timeout),
                 'start_time': script_details.get('start_time', ''),
                 'end_time': script_details.get('end_time', ''),
                 'cur_line_no': result.get('line_no', ''),
