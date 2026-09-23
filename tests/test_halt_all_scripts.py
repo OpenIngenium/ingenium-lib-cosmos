@@ -110,4 +110,4 @@ class TestMain:
         output = last_output_dict(mock_io)
         assert output['custom_script_status'] == 'FAIL'
         assert output['output']['scripts_halted'] == 0
-        assert output['output_array'][0]['halted'] is False
+        assert output['output_array'][0]['script_halted'] is False
