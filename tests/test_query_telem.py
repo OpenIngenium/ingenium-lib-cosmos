@@ -94,6 +94,15 @@ def last_output_dict(write_mock):
 
 
 class TestMain:
+    def test_build_combined_query_uses_canonical_name_for_uuid_and_entry_map(self):
+        telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
+        entries = [make_entry(telem_name=f'{telem_name},1234')]
+
+        query, entry_map = query_telem.build_combined_query(make_input(entries), entries)
+
+        assert query[0]['telem_uuid'] == telem_name
+        assert entry_map == {telem_name: 'EU'}
+
     def test_client_init_failure_exits_with_error(self, mocker, mock_io):
         set_input(mocker, [])
         mocker.patch.object(query_telem, 'CosmosAPIClient', side_effect=ValueError('bad config'))
@@ -284,6 +293,44 @@ class TestMain:
         assert {p['telem_uuid'] for p in query_arg} == {telem_a, telem_b}
         assert all(p['verification_condition'] == 'EQUAL' for p in query_arg)
         assert all(p['verification_values'] == ['INHIBIT'] for p in query_arg)
+
+    def test_csv_telem_name_is_normalized_for_query_and_change_lookup(self, mocker, mock_io):
+        telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
+        telem_id = '1234'
+        set_input(
+            mocker,
+            [make_entry(telem_name=f'{telem_name},{telem_id}', verify_on='CHANGE')],
+            states={'variables': {'channel_variables': {telem_name: 4}}},
+        )
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        verify_mock = mocker.patch.object(
+            query_telem, 'verify_wait_telemetry',
+            return_value=[make_results([
+                make_predict_result(telem_name, actual_value=1, verification_status='PASS'),
+            ])],
+        )
+
+        query_telem.main()
+
+        query_arg = verify_mock.call_args[0][0]
+        assert query_arg[0]['telem_uuid'] == telem_name
+        assert query_arg[0]['prior_value'] == 4
+        output = last_output_dict(mock_io)
+        assert output['entries'][0]['entry_inputs']['telem_name'] == f'{telem_name},{telem_id}'
+        assert telem_name in output['output_summary']
+        assert f'{telem_name},{telem_id}' not in output['output_summary']
+
+    def test_empty_csv_telem_name_marks_entry_error(self, mocker, mock_io):
+        set_input(mocker, [make_entry(telem_name=',1234')])
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
+
+        query_telem.main()
+
+        verify_mock.assert_not_called()
+        output = last_output_dict(mock_io)
+        assert output['entries'][0]['verification_status'] == 'ERROR'
+        assert output['custom_script_status'] == 'ERROR'
 
     def test_timeout_lookback_start_time_sourced_from_top_level_inputs(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'

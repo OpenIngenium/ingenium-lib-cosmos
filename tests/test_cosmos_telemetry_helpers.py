@@ -5,7 +5,7 @@ build_packet_timeformatted_item, cosmos_telemetry_query_func.
 """
 import pytest
 
-from ing_lib.steps import check_telemetry_query
+from ing_lib.steps import InputError, check_telemetry_query
 from ing_lib_cosmos.cosmos import (
     split_channel_name, build_query_dict,
     build_query_telemetry_item, build_packet_timeformatted_item,
@@ -99,6 +99,19 @@ class TestBuildQueryDict:
         assert 'bit_mask' not in predict
         assert 'bit_op' not in predict
         check_telemetry_query([predict])
+
+    def test_bit_mask_without_bit_op_is_invalid(self):
+        predict = {
+            'telem_uuid': 'TESTPKT__GENERIC/CHANNEL_ONE__STATUS_WORD',
+            'verify_wait': 'VERIFY',
+            'dn_eu': 'DN',
+            'verification_condition': 'EQUAL',
+            'verification_values': ['1'],
+            'bit_mask': '0x1',
+        }
+
+        with pytest.raises(InputError):
+            check_telemetry_query([predict])
 
     def test_bit_mask_and_bit_op_included_when_present(self):
         entry_inputs = {
