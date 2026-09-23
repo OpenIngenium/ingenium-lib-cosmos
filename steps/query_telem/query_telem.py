@@ -59,6 +59,27 @@ def parse_start_time(start_time_raw):
         raise InputError(msg) from e
 
 
+def parse_telem_name(telem_name_raw):
+    """Extract and validate the canonical telemetry name from input CSV data.
+
+    The custom-script input stores telemetry metadata as ``telem_name,telem_id``.
+    Only the telemetry name is used to build COSMOS queries; the ID remains in
+    the original entry input for output compatibility.
+    """
+    if not isinstance(telem_name_raw, str):
+        raise InputError(
+            f"Invalid telem_name {telem_name_raw!r}: expected 'telem_name,telem_id'"
+        )
+
+    telem_name = telem_name_raw.split(',', 1)[0].strip()
+    if not telem_name:
+        raise InputError(
+            f"Invalid telem_name {telem_name_raw!r}: telemetry name is empty"
+        )
+
+    return telem_name
+
+
 def build_combined_query(input_dict, entries):
     """
     Build a single combined query dict (and matching channel_name -> dn_eu map)
@@ -84,7 +105,8 @@ def build_combined_query(input_dict, entries):
 
     for entry in entries:
         entry_inputs = entry['entry_inputs']
-        telem_name = entry_inputs['telem_name']
+        telem_name = parse_telem_name(entry_inputs['telem_name'])
+        normalized_entry_inputs = {**entry_inputs, 'telem_name': telem_name}
         dn_eu = entry_inputs['dn_eu']
         prior_value = None
 
@@ -93,7 +115,7 @@ def build_combined_query(input_dict, entries):
         if entry_inputs.get('verify_on', 'VALUE') == 'CHANGE':
             prior_value = get_telem_prior_value(input_dict, telem_name)
 
-        query.append(build_query_dict(entry_inputs, prior_value=prior_value))
+        query.append(build_query_dict(normalized_entry_inputs, prior_value=prior_value))
         entry_map[telem_name] = dn_eu
 
     return query, entry_map
@@ -203,7 +225,7 @@ def main():
             ):
                 output_summary = ''
                 for i, entry in enumerate(entries):
-                    telem_name = entry['entry_inputs']['telem_name']
+                    telem_name = parse_telem_name(entry['entry_inputs']['telem_name'])
                     entry_result = results['predict_results'][i]
 
                     apply_telem_result_to_entry(entry, entry_result)

@@ -1405,7 +1405,8 @@ def build_query_dict(entry_inputs: Dict[str, Any], prior_value: Optional[float] 
     from a query_telem.py entry's entry_inputs.
 
     Args:
-        entry_inputs: Dict containing 'channel_name', 'verify_wait', 'dn_eu',
+        entry_inputs: Dict containing a canonical 'telem_name' (without the
+            input's optional ',telem_id' suffix), 'verify_wait', 'dn_eu',
             'verification_condition', 'verification_values', and optionally
             'bit_mask'/'bit_op'
         prior_value: Prior value to diff against (only meaningful when the
