@@ -1229,11 +1229,11 @@ class CosmosAPIClient:
 
         Yields:
             Intermediate: raw get_script() dict ('found', 'running', 'state',
-                'line_no', 'script') for each poll.
+                'line_no', 'script', 'timeout_remaining') for each poll.
             Final: dict with completion status ('state', 'script_id',
-                'running', and 'error' when applicable). 'error'/'stopped'
-                states are yielded as data, not raised, since they are
-                legitimate script outcomes.
+                'running', 'timeout_remaining', and 'error' when applicable).
+                'error'/'stopped' states are yielded as data, not raised, since
+                they are legitimate script outcomes.
 
         Raises:
             CosmosScriptError: If the script does not reach a terminal state
@@ -1244,8 +1244,14 @@ class CosmosAPIClient:
 
         logger.info(f"Waiting for script {script_id} completion (timeout: {timeout}s)...")
 
-        while (time.time() - start_time) < timeout:
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed >= timeout:
+                break
+            timeout_remaining = max(0, int(timeout - elapsed))
+
             status = self.get_script(script_id)
+            status['timeout_remaining'] = timeout_remaining
             yield status
 
             if status['found']:
@@ -1259,16 +1265,24 @@ class CosmosAPIClient:
                     script_executed = True
 
                 if state == 'error':
-                    yield self._handle_script_error(script, script_id)
+                    result = self._handle_script_error(script, script_id)
+                    result['timeout_remaining'] = timeout_remaining
+                    yield result
                     return
                 elif state == 'stopped':
-                    yield self._handle_script_stopped(script_id)
+                    result = self._handle_script_stopped(script_id)
+                    result['timeout_remaining'] = timeout_remaining
+                    yield result
                     return
                 elif state in ['completed', 'done']:
-                    yield self._handle_script_success(script_id, state)
+                    result = self._handle_script_success(script_id, state)
+                    result['timeout_remaining'] = timeout_remaining
+                    yield result
                     return
             else:
-                yield self._handle_script_not_found(script_id, script_executed)
+                result = self._handle_script_not_found(script_id, script_executed)
+                result['timeout_remaining'] = timeout_remaining
+                yield result
                 return
 
             time.sleep(poll_interval)

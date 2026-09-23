@@ -689,6 +689,8 @@ class TestMonitorScript:
 
         assert result['running'] is False
         assert result['state'] == 'completed'
+        assert isinstance(result['timeout_remaining'], int)
+        assert result['timeout_remaining'] >= 0
 
     def test_error_state(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -703,6 +705,8 @@ class TestMonitorScript:
         assert result['running'] is False
         assert result['state'] == 'error'
         assert 'boom' in result['error']
+        assert isinstance(result['timeout_remaining'], int)
+        assert result['timeout_remaining'] >= 0
 
     def test_stopped_state(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -715,6 +719,8 @@ class TestMonitorScript:
 
         assert result['running'] is False
         assert result['state'] == 'stopped'
+        assert isinstance(result['timeout_remaining'], int)
+        assert result['timeout_remaining'] >= 0
 
     def test_not_found_never_executed(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -727,6 +733,8 @@ class TestMonitorScript:
 
         assert result['state'] == 'not_found'
         assert 'never progressed' in result['error']
+        assert isinstance(result['timeout_remaining'], int)
+        assert result['timeout_remaining'] >= 0
 
     def test_not_found_after_executed(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -741,6 +749,8 @@ class TestMonitorScript:
 
         assert result['state'] == 'completed'
         assert result['running'] is False
+        assert isinstance(result['timeout_remaining'], int)
+        assert result['timeout_remaining'] >= 0
 
     def test_timeout(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -756,6 +766,21 @@ class TestMonitorScript:
 
         with pytest.raises(CosmosScriptError):
             list(client.monitor_script(1, timeout=5, poll_interval=1))
+
+    def test_timeout_remaining_is_streamed_to_terminal_result(self, full_env, mocker):
+        client = make_client(mocker, full_env)
+        mocker.patch.object(client, 'get_script', side_effect=[
+            {'found': True, 'running': True, 'state': 'running', 'line_no': 1, 'script': {}},
+            {'found': True, 'running': True, 'state': 'running', 'line_no': 2, 'script': {}},
+            {'found': True, 'running': False, 'state': 'completed', 'line_no': 3, 'script': {}},
+        ])
+        mocker.patch('ing_lib_cosmos.cosmos.time.sleep')
+        mocker.patch('ing_lib_cosmos.cosmos.time.time', side_effect=[100, 100, 102, 104])
+
+        results = list(client.monitor_script(1, timeout=5))
+
+        assert [result['timeout_remaining'] for result in results] == [5, 3, 1, 1]
+        assert all(isinstance(result['timeout_remaining'], int) for result in results)
 
     def test_intermediate_statuses_streamed_before_terminal(self, full_env, mocker):
         client = make_client(mocker, full_env)

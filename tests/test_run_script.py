@@ -72,8 +72,9 @@ class TestMain:
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 42, 'running': True}
         client.monitor_script.return_value = iter([
-            {'found': True, 'running': True, 'state': 'running', 'line_no': 1, 'script': {}},
-            {'script_id': 42, 'state': 'completed', 'running': False},
+            {'found': True, 'running': True, 'state': 'running', 'line_no': 1,
+             'timeout_remaining': 5, 'script': {}},
+            {'script_id': 42, 'state': 'completed', 'running': False, 'timeout_remaining': 3},
         ])
         mocker.patch.object(run_script, 'CosmosAPIClient', return_value=client)
 
@@ -82,6 +83,7 @@ class TestMain:
         output = last_output_dict(mock_io)
         entry = output['entries'][0]
         assert entry['verification_status'] == 'PASS'
+        assert entry['entry_outputs']['timeout_remaining'] == 3
         assert output['custom_script_status'] == 'PASS'
 
     def test_wait_for_completion_failure_marks_fail(self, mocker, mock_io):

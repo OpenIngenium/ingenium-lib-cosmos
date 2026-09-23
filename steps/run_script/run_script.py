@@ -115,6 +115,7 @@ def main():
                         'running': result.get('running', ''),
                         'script_id': result.get('script_id', script_id),
                         'state': result.get('state', ''),
+                        'timeout_remaining': result.get('timeout_remaining', 0),
                         'start_time': script_details.get('start_time', ''),
                         'end_time': script_details.get('end_time', ''),
                         'cur_line_no': result.get('line_no', script_details.get('line_no', '')),
