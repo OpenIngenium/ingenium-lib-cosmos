@@ -774,8 +774,8 @@ class TestMonitorScript:
             {'found': True, 'running': True, 'state': 'running', 'line_no': 2, 'script': {}},
             {'found': True, 'running': False, 'state': 'completed', 'line_no': 3, 'script': {}},
         ])
-        mocker.patch('ing_lib_cosmos.cosmos.time.sleep')
-        mocker.patch('ing_lib_cosmos.cosmos.time.time', side_effect=[100, 100, 102, 104])
+        time_mock = mocker.patch('ing_lib_cosmos.cosmos.time')
+        time_mock.time.side_effect = [100, 100, 102, 104]
 
         results = list(client.monitor_script(1, timeout=5))
 

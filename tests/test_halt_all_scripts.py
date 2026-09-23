@@ -66,8 +66,8 @@ class TestMain:
 
         output = last_output_dict(mock_io)
         assert output['custom_script_status'] == 'PASS'
-        assert output['output']['scripts_running'] == 0
-        assert output['output']['scripts_halted'] == 0
+        assert output['outputs']['scripts_running'] == 0
+        assert output['outputs']['scripts_halted'] == 0
         client.halt_script.assert_not_called()
 
     def test_halts_all_running_scripts_passes(self, mocker, mock_io):
@@ -90,8 +90,8 @@ class TestMain:
 
         output = last_output_dict(mock_io)
         assert output['custom_script_status'] == 'PASS'
-        assert output['output']['scripts_running'] == 2
-        assert output['output']['scripts_halted'] == 2
+        assert output['outputs']['scripts_running'] == 2
+        assert output['outputs']['scripts_halted'] == 2
         assert client.halt_script.call_count == 2
 
     def test_halt_failure_marks_overall_fail(self, mocker, mock_io):
@@ -109,5 +109,5 @@ class TestMain:
 
         output = last_output_dict(mock_io)
         assert output['custom_script_status'] == 'FAIL'
-        assert output['output']['scripts_halted'] == 0
+        assert output['outputs']['scripts_halted'] == 0
         assert output['output_array'][0]['script_halted'] is False

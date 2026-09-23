@@ -38,7 +38,7 @@ def main():
     output_dict = {
         'custom_script_status': 'PENDING',
         'inputs': input_dict,
-        'output': outputs,
+        'outputs': outputs,
         'output_array': scripts_halted,
         'output_summary': {}
     }
