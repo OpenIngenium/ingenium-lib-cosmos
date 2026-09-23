@@ -27,7 +27,7 @@ def make_input(entries, states=None, inputs=None):
 
 def make_entry(telem_name='TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
                verify_wait='VERIFY', verify_on='VALUE', dn_eu='EU',
-               verification_condition='EQUAL', verification_values=None,
+               verification_condition='EQUAL,INHIBIT,,',
                bit_mask=None, bit_op='NONE'):
     return {
         'entry_inputs': {
@@ -36,7 +36,6 @@ def make_entry(telem_name='TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
             'verify_on': verify_on,
             'dn_eu': dn_eu,
             'verification_condition': verification_condition,
-            'verification_values': verification_values if verification_values is not None else ['INHIBIT'],
             'bit_mask': bit_mask,
             'bit_op': bit_op,
         },
@@ -217,8 +216,7 @@ class TestMain:
     def test_verify_on_change_passes_prior_value_from_states(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_TWO__FIELD_B'
         states = {'variables': {'channel_variables': {telem_name: 4}}}
-        set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE',
-                                       verification_values=[1])], states=states)
+        set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE')], states=states)
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
             query_telem, 'verify_wait_telemetry',
@@ -235,8 +233,7 @@ class TestMain:
     def test_verify_on_change_missing_channel_defaults_to_none(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_TWO__FIELD_B'
         states = {'variables': {'channel_variables': {}}}
-        set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE',
-                                       verification_values=[1])], states=states)
+        set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE')], states=states)
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
             query_telem, 'verify_wait_telemetry',
@@ -285,6 +282,8 @@ class TestMain:
         assert verify_mock.call_count == 1
         query_arg = verify_mock.call_args[0][0]
         assert {p['telem_uuid'] for p in query_arg} == {telem_a, telem_b}
+        assert all(p['verification_condition'] == 'EQUAL' for p in query_arg)
+        assert all(p['verification_values'] == ['INHIBIT'] for p in query_arg)
 
     def test_timeout_lookback_start_time_sourced_from_top_level_inputs(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
