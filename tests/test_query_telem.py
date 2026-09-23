@@ -28,7 +28,7 @@ def make_input(entries, states=None, inputs=None):
 def make_entry(telem_name='TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
                verify_wait='VERIFY', verify_on='VALUE', dn_eu='EU',
                verification_condition='EQUAL', verification_values=None,
-               bit_mask=None, bit_op=None):
+               bit_mask=None, bit_op='NONE'):
     return {
         'entry_inputs': {
             'telem_name': telem_name,

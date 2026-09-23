@@ -20,7 +20,7 @@ init_console_logger()
 logger = get_logger(__name__)
 
 from ing_lib.steps import (
-    get_input_output_paths, read_input_file, write_output_file, write_series_file,
+    get_input_output_paths, read_input_file, write_output_file,
     verify_wait_telemetry, InputError, get_telem_prior_value
 )
 from ing_lib_cosmos.cosmos import (

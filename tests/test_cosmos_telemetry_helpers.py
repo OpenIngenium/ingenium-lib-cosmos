@@ -72,6 +72,22 @@ class TestBuildQueryDict:
         assert predict['prior_value'] == 4
         check_telemetry_query([predict])
 
+    def test_none_bit_op_omits_bitmask_fields(self):
+        entry_inputs = {
+            'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__STATUS_WORD',
+            'verify_wait': 'VERIFY',
+            'dn_eu': 'DN',
+            'verification_condition': 'EQUAL',
+            'verification_values': [1],
+            'bit_mask': '0x1',
+            'bit_op': 'NONE',
+        }
+        predict = build_query_dict(entry_inputs)
+
+        assert 'bit_mask' not in predict
+        assert 'bit_op' not in predict
+        check_telemetry_query([predict])
+
     def test_bit_mask_and_bit_op_included_when_present(self):
         entry_inputs = {
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__STATUS_WORD',

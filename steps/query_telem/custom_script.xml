@@ -23,6 +23,7 @@
             <input_field description="How to evaluate this telemetry" name="verification_condition" phase="AUTHORING" required="YES" type="VERIFICATION_COND"/>
             <input_field description="Bitmask (either using hex, binary, or decimal)" name="bitmask" phase="AUTHORING" required="NO" type="STRING"/>
             <input_field description="Bitmask (either using hex, binary, or decimal)" name="bit_op" phase="AUTHORING" required="NO" type="ENUM">
+                    <enum symbolic="NONE"></enum>
                     <enum symbolic="AND"></enum>
                     <enum symbolic="OR"></enum>
             </input_field>
