@@ -15,6 +15,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from ing_lib.logs import get_logger
+from ing_lib.steps import translate_verification_conditions
 logger = get_logger(__name__)
 
 
@@ -1415,12 +1416,15 @@ def build_query_dict(entry_inputs: Dict[str, Any], prior_value: Optional[float] 
         `query` argument to verify_wait_telemetry()
     """
 
+    translated_vc = translate_verification_conditions(entry_inputs['verification_condition'])
+
+
     predict = {
         'telem_uuid' : entry_inputs['telem_name'],
         'verify_wait': entry_inputs['verify_wait'],
         'dn_eu': entry_inputs['dn_eu'],
-        'verification_condition': entry_inputs['verification_condition'],
-        'verification_values': entry_inputs.get('verification_values', []),
+        'verification_condition': translated_vc.get('verification_condition'),
+        'verification_values': translated_vc.get('verification_values', []),
     }
 
     bit_op = entry_inputs.get('bit_op')

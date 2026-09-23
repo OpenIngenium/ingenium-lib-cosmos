@@ -45,8 +45,7 @@ class TestBuildQueryDict:
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
             'verify_wait': 'VERIFY',
             'dn_eu': 'EU',
-            'verification_condition': 'EQUAL',
-            'verification_values': ['INHIBIT'],
+            'verification_condition': 'EQUAL,INHIBIT,,',
         }
         predict = build_query_dict(entry_inputs)
 
@@ -59,13 +58,27 @@ class TestBuildQueryDict:
         # Should be a valid predict per check_telemetry_query (expects a list)
         check_telemetry_query([predict])
 
+    def test_translates_range_values_from_comma_delimited_condition(self):
+        entry_inputs = {
+            'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_C',
+            'verify_wait': 'VERIFY',
+            'dn_eu': 'EU',
+            'verification_condition': 'EXCLUSIVE_RANGE,,10,20',
+            'verification_values': ['ignored', 'values'],
+        }
+
+        predict = build_query_dict(entry_inputs)
+
+        assert predict['verification_condition'] == 'EXCLUSIVE_RANGE'
+        assert predict['verification_values'] == ['10', '20']
+        check_telemetry_query([predict])
+
     def test_prior_value_included_when_provided(self):
         entry_inputs = {
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_B',
             'verify_wait': 'VERIFY',
             'dn_eu': 'EU',
-            'verification_condition': 'EQUAL',
-            'verification_values': [1],
+            'verification_condition': 'EQUAL,1,,',
         }
         predict = build_query_dict(entry_inputs, prior_value=4)
 
@@ -77,8 +90,7 @@ class TestBuildQueryDict:
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__STATUS_WORD',
             'verify_wait': 'VERIFY',
             'dn_eu': 'DN',
-            'verification_condition': 'EQUAL',
-            'verification_values': [1],
+            'verification_condition': 'EQUAL,1,,',
             'bit_mask': '0x1',
             'bit_op': 'NONE',
         }
@@ -93,8 +105,7 @@ class TestBuildQueryDict:
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__STATUS_WORD',
             'verify_wait': 'VERIFY',
             'dn_eu': 'DN',
-            'verification_condition': 'EQUAL',
-            'verification_values': [1],
+            'verification_condition': 'EQUAL,1,,',
             'bit_mask': '0x1',
             'bit_op': 'AND',
         }
@@ -109,8 +120,7 @@ class TestBuildQueryDict:
             'telem_name': 'TESTPKT__GENERIC/CHANNEL_ONE__ANALOG_STATE.FIELD_C',
             'verify_wait': 'VERIFY',
             'dn_eu': 'EU',
-            'verification_condition': 'INCLUSIVE_RANGE',
-            'verification_values': [-217, -215],
+            'verification_condition': 'INCLUSIVE_RANGE,,-217,-215',
         }
         predict = build_query_dict(entry_inputs)
         check_telemetry_query([predict])

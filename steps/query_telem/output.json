@@ -7,10 +7,7 @@
                 "verify_wait": "WAIT",
                 "verify_on": "VALUE",
                 "dn_eu": "EU",
-                "verification_condition": "EQUAL",
-                "verification_values": [
-                    "BATMAN"
-                ],
+                "verification_condition": "EQUAL,BATMAN,,",
                 "bit_mask": null,
                 "bit_op": null
             },
