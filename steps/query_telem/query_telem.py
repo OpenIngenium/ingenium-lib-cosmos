@@ -70,8 +70,9 @@ def parse_telem_name(telem_name_raw):
         raise InputError(
             f"Invalid telem_name {telem_name_raw!r}: expected 'telem_name,telem_id'"
         )
-
+    logger.debug(f"telem_name_raw: {telem_name_raw}")
     telem_name = telem_name_raw.split(',', 1)[0].strip()
+    logger.debug(f"telem_name: {telem_name}")
     if not telem_name:
         raise InputError(
             f"Invalid telem_name {telem_name_raw!r}: telemetry name is empty"
@@ -105,9 +106,13 @@ def build_combined_query(input_dict, entries):
 
     for entry in entries:
         entry_inputs = entry['entry_inputs']
+        logger.debug(f"entry_inputs: {entry_inputs}")
         telem_name = parse_telem_name(entry_inputs['telem_name'])
+        logger.debug(f"telem_name: {telem_name}")
         normalized_entry_inputs = {**entry_inputs, 'telem_name': telem_name}
+        logger.debug(f"normalized_entry_inputs: {normalized_entry_inputs}")
         dn_eu = entry_inputs['dn_eu']
+        logger.debug(f"dn_eu: {dn_eu}")
         prior_value = None
 
         validate_dn_eu(telem_name, dn_eu, seen_dn_eu)
@@ -207,7 +212,7 @@ def main():
         mark_all_entries_error(entries, str(e))
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
-        return
+        sys.exit(-1)
 
     output_summary = ''
 
