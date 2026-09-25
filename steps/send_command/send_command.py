@@ -20,6 +20,22 @@ logger = get_logger(__name__)
 from ing_lib.steps import get_input_output_paths, read_input_file, write_output_file
 from ing_lib_cosmos.cosmos import CosmosAPIClient, IngeniumCosmosError
 
+def parse_command_string(raw_command):
+    """Parse an Ingenium command into its target, name, and arguments."""
+    if not isinstance(raw_command, str):
+        raise ValueError('command_string must be a string')
+
+    target, separator, command_part = raw_command.partition('__')
+    if not separator or not target.strip() or not command_part.strip():
+        raise ValueError("command_string must use the 'TARGET__COMMAND' format")
+
+    command, args_separator, args = command_part.partition('with')
+    command = command.strip()
+    if not command:
+        raise ValueError('command_string must include a command name')
+    return target.strip(), command, args.strip() if args_separator else ''
+
+
 def process_command_entry(client, entry):
     """
     client: CosmosAPIClient instance
@@ -34,18 +50,17 @@ def process_command_entry(client, entry):
     3. Checks the command count and time of dispatch (with a small delay)
     """
 
-    logger.debug(f'Command String (pre-process): {entry["entry_inputs"].get("command_string")}')
-    cmd_tgt = entry['entry_inputs'].get('command_string', '').split('__')[0]
-    cmd_cmd = entry['entry_inputs'].get('command_string', '').split('__')[1].split('with')[0].strip()
-    command_string = f'{cmd_tgt} {cmd_cmd}'
-
-    
+    raw_command = entry['entry_inputs'].get('command_string', '')
+    logger.debug(f'Command String (pre-process): {raw_command}')
     cmd_check = entry['entry_inputs'].get('cmd_check', '')
 
-    logger.debug(f'Command string: {command_string}')
-    logger.debug(f'Command check: {cmd_check}')
-
     try:
+        cmd_tgt, cmd_cmd, cmd_args = parse_command_string(raw_command)
+        command_string = f'{cmd_tgt} {cmd_cmd}'
+        if cmd_args:
+            command_string += f' with {cmd_args}'
+        logger.debug(f'Command string: {command_string}')
+        logger.debug(f'Command check: {cmd_check}')
         cmd_result = client.send_command(command_string, cmd_check)
         logger.debug(f'Command result: {cmd_result}')
 
@@ -56,7 +71,7 @@ def process_command_entry(client, entry):
 
         cmd_count = client.get_cmd_cnt(cmd_tgt, cmd_cmd)
         cmd_time = client.get_cmd_time(cmd_tgt, cmd_cmd)
-    except IngeniumCosmosError as e:
+    except (IngeniumCosmosError, ValueError) as e:
         logger.error(f'Command failed to send: {e}')
         entry['entry_outputs']['cmd_status'] = 'fail'
         entry['verification_status'] = 'FAIL'

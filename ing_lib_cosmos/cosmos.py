@@ -4,7 +4,6 @@ Handles token generation and refresh for OpenC3 COSMOS
 """
 
 import os
-from urllib.parse import uses_query
 
 import urllib3
 from typing import Tuple, Optional, Callable, List
@@ -169,15 +168,15 @@ def _resolve_env_param(param_value: Optional[str], env_var_name: str) -> str:
     return value
 
 
-def _extract_jsonrpc_error(parsed: Any) -> Optional[Dict[str, Any]]:
+def _format_jsonrpc_error(parsed: Any) -> Optional[str]:
     """
-    Extract the JSON-RPC 'error' object from an already-parsed response body.
+    Format the JSON-RPC error from an already-parsed response body.
 
     Args:
         parsed: Parsed JSON body (typically a dict)
 
     Returns:
-        The 'error' dict if present, or None
+        A formatted error message if an error is present, or None.
     """
     rpc_error = parsed.get('error') if isinstance(parsed, dict) else None
 
@@ -186,12 +185,12 @@ def _extract_jsonrpc_error(parsed: Any) -> Optional[Dict[str, Any]]:
             error_message = f"RPC Error: {rpc_error.get('message')}"
         except (KeyError, TypeError, AttributeError):
             error_message = f'RPC Error: {rpc_error}'
-        
+
         try:
             data_error = parsed['error']['data'].get('message')
         except (KeyError, TypeError, AttributeError):
             data_error = None
-    
+
         if data_error:
             error_message += f" - Data Error: {data_error}"
     else:
@@ -217,7 +216,7 @@ def _extract_jsonrpc_error_message(text: str) -> Optional[str]:
     except (ValueError, TypeError):
         return None
     
-    error = _extract_jsonrpc_error(parsed)
+    error = _format_jsonrpc_error(parsed)
 
     return error
 
@@ -627,8 +626,9 @@ class CosmosAPIClient:
     def _authed_request(self, verb: Callable[..., requests.Response], url: str, timeout: int,
                          **kwargs: Any) -> requests.Response:
         """
-        Ensure a valid token is present, perform the request, and retry once
-        (after invalidating the cached token) if the server responds 401/403.
+        Ensure a valid token is present and perform the request. A 401/403
+        invalidates the cached token for the next request but is not retried,
+        because retrying could duplicate a non-idempotent operation.
 
         Args:
             verb: Bound request method (e.g. requests.post, self.session.get)
@@ -646,19 +646,11 @@ class CosmosAPIClient:
         """
         self._ensure_token()
 
-        # Refresh headers on the kwargs in case caller passed explicit headers
-        if 'headers' in kwargs and kwargs['headers'] is self.headers:
-            kwargs['headers'] = self.headers
-
         response = _request(verb, url, timeout, **kwargs)
 
         if response.status_code in (401, 403):
-            logger.info("Received %s, invalidating token and retrying once", response.status_code)
+            logger.info("Received %s; invalidating token for the next request", response.status_code)
             self.auth.invalidate()
-            self._ensure_token()
-            if 'headers' in kwargs:
-                kwargs['headers'] = self.headers
-            response = _request(verb, url, timeout, **kwargs)
 
         return response
 
@@ -976,7 +968,7 @@ class CosmosAPIClient:
         return result
 
     def start_script(self, script_name: str, environment: Optional[list] = None,
-                     lock: bool = True, timeout: int = RUN_TIMEOUT) -> Dict[str, Any]:
+                     lock: bool = True) -> Dict[str, Any]:
         """
         Start a script via the COSMOS Script Runner REST API
 
@@ -987,7 +979,9 @@ class CosmosAPIClient:
             script_name: Script name/path (e.g., "HANDLE/procedures/script.py")
             environment: Optional list of environment entries passed to the script
             lock: If True, lock the script before running it
-            timeout: HTTP timeout for the run request (seconds)
+
+        The run request uses the fixed RUN_TIMEOUT HTTP timeout. Use the
+        timeout argument to monitor_script() to control script completion waiting.
 
         Returns:
             Dict with 'script_id' and 'running' (True)
@@ -1022,7 +1016,7 @@ class CosmosAPIClient:
             except IngeniumCosmosError as e:
                 logger.warning(f"Lock request failed: {e}")
 
-        response = self._authed_request(self.session.post, run_url, timeout, json={"environment": environment or []},
+        response = self._authed_request(self.session.post, run_url, RUN_TIMEOUT, json={"environment": environment or []},
                                          verify=self.verify_ssl)
 
         if response.status_code not in [200, 201]:
@@ -1483,11 +1477,7 @@ def build_packet_timeformatted_item(target: str, packet: str) -> str:
     return f"{target}__{packet}__PACKET_TIMEFORMATTED__RAW"
 
 
-def strip_suffix(name):
-    for suffix in ("__RAW", "__CONVERTED"):
-        if name.endswith(suffix):
-            return name[: -len(suffix)]
-    return name
+VALUE_TYPE_BY_DN_EU = {'DN': 'raw_value', 'EU': 'eng_value'}
 
 
 def cosmos_telemetry_query_func(client: 'CosmosAPIClient', entry_map: Dict[str, str]) -> Callable:
@@ -1521,61 +1511,68 @@ def cosmos_telemetry_query_func(client: 'CosmosAPIClient', entry_map: Dict[str, 
     def telemetry_query_func(telemetry: List[str], timeout: int, lookback: int,
                               start_time: Any, return_on: Any) -> Dict[str, Any]:
 
-        unique_packets = []
         telemetry_to_query = []
+        time_item_indices = {}
+        channel_specs = []
 
-        for telemetry_name in telemetry:
-            dn_eu = entry_map[telemetry_name]
-            target, packet, tlm_point = split_channel_name(telemetry_name)
-            telemetry_query_name = build_query_telemetry_item(target, packet, tlm_point, dn_eu)
-            telemetry_to_query.append(telemetry_query_name)
-            packet_name = f'{target}{CHANNEL_NAME_DELIMITER}{packet}'
-            if packet_name not in unique_packets:
-                unique_packets.append(packet_name)
-                packet_time_channel = build_packet_timeformatted_item(target, packet)
-                telemetry_to_query.append(packet_time_channel)
+        for channel_name in telemetry:
+            try:
+                dn_eu = entry_map[channel_name]
+                value_type = VALUE_TYPE_BY_DN_EU[dn_eu]
+            except KeyError as e:
+                raise ValueError(f"Unknown telemetry channel or dn_eu for {channel_name!r}") from e
 
-        # if no start time is provided, use current time
+            target, packet, tlm_point = split_channel_name(channel_name)
+            value_index = len(telemetry_to_query)
+            telemetry_to_query.append(build_query_telemetry_item(target, packet, tlm_point, dn_eu))
+
+            time_item = build_packet_timeformatted_item(target, packet)
+            if time_item not in time_item_indices:
+                time_item_indices[time_item] = len(telemetry_to_query)
+                telemetry_to_query.append(time_item)
+
+            channel_specs.append((channel_name, value_index, time_item_indices[time_item], value_type))
+
         if not hasattr(start_time, 'isoformat'):
             start_time = datetime.now(timezone.utc)
 
-        # compute query window
         query_start = start_time - timedelta(seconds=lookback)
         query_end = start_time + timedelta(seconds=timeout)
         start_time_str = query_start.replace(microsecond=0).isoformat().replace('+00:00', '')
         end_time_str = query_end.replace(microsecond=0).isoformat().replace('+00:00', '')
 
-        try:
-            series = client.query_telemetry(telemetry_to_query, start_time=start_time_str, end_time=end_time_str,
-                                            timeout=timeout)
-        except IngeniumCosmosError as e:
-            logger.error(f"Telemetry query failed for telemetry {telemetry_to_query}: {e}")
+        series = client.query_telemetry(
+            telemetry_to_query,
+            start_time=start_time_str,
+            end_time=end_time_str,
+            timeout=timeout,
+        )
 
-        telemetry_results = {}
-
-        for data in series:
-            for item, values in zip(telemetry_to_query, data):
-                if not telemetry_results.get(item):
-                    telemetry_results[item]=[]
-                telemetry_results[item].append(values[0])
+        columns = [[] for _ in telemetry_to_query]
+        for row_index, row in enumerate(series):
+            if len(row) != len(telemetry_to_query):
+                raise CosmosRequestError(
+                    f'COSMOS returned {len(row)} values for {len(telemetry_to_query)} '
+                    f'requested items in sample {row_index}'
+                )
+            for item_index, cell in enumerate(row):
+                if not isinstance(cell, (list, tuple)) or not cell:
+                    raise CosmosRequestError(
+                        f'COSMOS returned an invalid value for item {item_index} '
+                        f'in sample {row_index}'
+                    )
+                columns[item_index].append(cell[0])
 
         results = {}
-
-        for packet in unique_packets:
-            packet_time_channel = f"{packet}__PACKET_TIMEFORMATTED__RAW"
-
-            for telemetry in telemetry_results:
-                if packet in telemetry:
-                    if telemetry != packet_time_channel:
-                        if entry_map[strip_suffix(telemetry)] == 'DN':
-                            value_type = 'raw_value'
-                        elif entry_map[strip_suffix(telemetry)] == 'EU':
-                            value_type = 'eng_value'
-                        time_value_pairs = sorted(
-                            zip(telemetry_results[packet_time_channel], telemetry_results[telemetry]),
-                            key=lambda pair: pair[0]
-                        )
-                        results[strip_suffix(telemetry)] = [{'time': t, value_type: v} for t, v in time_value_pairs]
+        for channel_name, value_index, time_index, value_type in channel_specs:
+            time_value_pairs = sorted(
+                zip(columns[time_index], columns[value_index]),
+                key=lambda pair: pair[0],
+            )
+            results[channel_name] = [
+                {'time': timestamp, value_type: value}
+                for timestamp, value in time_value_pairs
+            ]
         return results
 
     return telemetry_query_func

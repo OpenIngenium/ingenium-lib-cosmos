@@ -9,7 +9,6 @@ the value matches the prediction, or FAIL if it does not match.
 Note that this will not function on
 """
 
-import os
 import sys
 import copy
 from datetime import datetime, timezone
@@ -140,20 +139,6 @@ def apply_telem_result_to_entry(entry, telem_result):
     entry['entry_outputs']['telem_time'] = telem_details.get('time')
 
 
-def mark_all_entries_error(entries, error_message):
-    """
-    Mark every entry as ERROR with the given error message. Used when a failure
-    occurs before/during the single combined verify_wait_telemetry call, since
-    that failure cannot be isolated to a single entry.
-    """
-    for entry in entries:
-        entry['verification_status'] = 'ERROR'
-        entry['entry_outputs']['queried_value'] = ''
-        entry['entry_outputs']['actual_value'] = ''
-        entry['entry_outputs']['comparison_result'] = f'ERROR: {error_message}'
-        entry['entry_outputs']['history'] = []
-
-
 # Main logic
 def main():
 
@@ -209,7 +194,9 @@ def main():
         query, entry_map = build_combined_query(input_dict, entries)
     except (InputError, ValueError) as e:
         logger.error(f'Failed to build combined telemetry query: {e}')
-        mark_all_entries_error(entries, str(e))
+        for entry in entries:
+            entry['verification_status'] = 'ERROR'
+        output_dict['output_summary'] = f'Telemetry query construction failed: {e}'
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
         sys.exit(-1)
@@ -244,10 +231,12 @@ def main():
                 write_output_file(output_dict, output_file_abs_path)
         except (InputError, IngeniumCosmosError) as e:
             logger.error(f'Telemetry verification failed: {e}')
-            mark_all_entries_error(entries, str(e))
+            for entry in entries:
+                entry['verification_status'] = 'ERROR'
+            output_dict['output_summary'] = f'Telemetry verification failed: {e}'
             output_dict['custom_script_status'] = 'ERROR'
             write_output_file(output_dict, output_file_abs_path)
-            return
+            sys.exit(-1)
 
     # Determine overall custom_script_status
     statuses = [entry['verification_status'] for entry in entries]

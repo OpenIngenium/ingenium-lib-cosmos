@@ -8,7 +8,6 @@ It can run one or multiple scripts and monitor their execution.
 
 import sys
 import copy
-import time
 from ing_lib.logs import get_logger,init_console_logger
 
 # Log Level set via ING_LOG_LEVEL environment variable (defaults)
@@ -16,7 +15,7 @@ init_console_logger()
 logger = get_logger(__name__)
 
 from ing_lib.steps import get_input_output_paths, read_input_file, write_output_file
-from ing_lib_cosmos.cosmos import CosmosAPIClient, IngeniumCosmosError
+from ing_lib_cosmos.cosmos import CosmosAPIClient, IngeniumCosmosError, DEFAULT_SCRIPT_TIMEOUT
 
 def main():
     """Main execution function"""
@@ -65,14 +64,24 @@ def main():
         
         logger.debug(f"Processing script entry: {entry}")
     
-        entry_inputs = entry.get('entry_inputs', {})
-        script_name = entry_inputs.get('script_name', '')
-        wait_for_completion = entry_inputs.get('wait_for_completion', True)
-        timeout = int(entry_inputs.get('timeout', None))
-
-        # Start the script. 
         try:
-            start_results = client.start_script(script_name, timeout=timeout)
+            entry_inputs = entry.get('entry_inputs', {})
+            script_name = entry_inputs.get('script_name', '')
+            wait_for_completion = entry_inputs.get('wait_for_completion', True)
+            timeout = int(entry_inputs.get('timeout') or DEFAULT_SCRIPT_TIMEOUT)
+        except (TypeError, ValueError) as e:
+            logger.error(f"Invalid script entry inputs: {e}")
+            entry['verification_status'] = 'FAIL'
+            entry['entry_outputs'] = {
+                'success': False,
+                'error': str(e)
+            }
+            write_output_file(output_dict, output_file_abs_path)
+            continue
+
+        # Start the script.
+        try:
+            start_results = client.start_script(script_name)
         except Exception as e:
             logger.error(f"Failed to start script: {e}")
             entry['verification_status'] = 'FAIL'
@@ -139,7 +148,7 @@ def main():
 
             if result.get('state') in ('completed', 'done'):
                 entry['verification_status'] = 'PASS'
-                logger.info(f"  ✓ Script execution successful")
+                logger.info("  ✓ Script execution successful")
             else:
                 entry['verification_status'] = 'FAIL'
                 logger.info(f"  ✗ Script execution failed: {result.get('state')}")
@@ -169,7 +178,7 @@ def main():
 
             if result.get('found'):
                 entry['verification_status'] = 'PASS'
-                logger.info(f"  ✓ Script execution started")
+                logger.info("  ✓ Script execution started")
             else:
                 entry['verification_status'] = 'FAIL'
                 entry['entry_outputs']['error'] = 'Script not found'
