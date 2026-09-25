@@ -99,6 +99,8 @@ class TestMain:
             previous == 5 and current == 3
             for previous, current in zip(updates, updates[1:])
         )
+        client.start_script.assert_called_once_with('TARGET/procedures/script.py')
+        client.monitor_script.assert_called_once_with(42, timeout=5)
 
     def test_wait_for_completion_failure_marks_fail(self, mocker, mock_io):
         set_input(mocker, [make_entry(wait_for_completion=True)])
@@ -134,6 +136,25 @@ class TestMain:
         entry = output['entries'][0]
         assert entry['verification_status'] == 'FAIL'
         assert 'timed out' in entry['entry_outputs']['error']
+
+    def test_missing_timeout_uses_default_and_continues(self, mocker, mock_io):
+        invalid_entry = make_entry(script_name='bad.py', timeout='not-an-int')
+        valid_entry = make_entry(script_name='good.py', wait_for_completion=False)
+        del valid_entry['entry_inputs']['timeout']
+        set_input(mocker, [invalid_entry, valid_entry])
+        client = mocker.Mock()
+        client.start_script.return_value = {'script_id': 7, 'running': True}
+        client.get_script.return_value = {
+            'found': True, 'running': True, 'state': 'running', 'line_no': 1, 'script': {}
+        }
+        mocker.patch.object(run_script, 'CosmosAPIClient', return_value=client)
+
+        run_script.main()
+
+        output = last_output_dict(mock_io)
+        assert output['entries'][0]['verification_status'] == 'FAIL'
+        assert output['entries'][1]['verification_status'] == 'PASS'
+        client.start_script.assert_called_once_with('good.py')
 
     def test_no_wait_found_marks_pass(self, mocker, mock_io):
         set_input(mocker, [make_entry(wait_for_completion=False)])

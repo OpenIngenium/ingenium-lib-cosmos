@@ -1,7 +1,6 @@
 """
 Tests for ing_lib_cosmos.cosmos.CosmosAPIClient
 """
-import time
 import json as json_module
 
 import pytest
@@ -9,7 +8,7 @@ import pytest
 from ing_lib_cosmos.cosmos import (
     CosmosAPIClient, CosmosAuth, IngeniumCosmosError, CosmosAuthError,
     CosmosRequestError, CosmosRPCError, CosmosScriptError,
-    SCRIPT_FILTER_RUNNING, SCRIPT_FILTER_COMPLETED, SCRIPT_FILTER_BOTH,
+    SCRIPT_FILTER_RUNNING, SCRIPT_FILTER_COMPLETED, RUN_TIMEOUT,
 )
 
 
@@ -96,32 +95,18 @@ class TestAuthedRequest:
         assert result is response
         verb.assert_called_once()
 
-    def test_401_retries_once_and_succeeds(self, full_env, mocker, response_factory):
+    def test_401_invalidates_token_without_retrying(self, full_env, mocker, response_factory):
         client = make_client(mocker, full_env)
         invalidate_mock = mocker.patch.object(client.auth, 'invalidate')
 
         unauthorized = response_factory(status_code=401, text='unauthorized')
-        ok = response_factory(status_code=200, json_data={'result': 'ok'})
-        verb = mocker.Mock(side_effect=[unauthorized, ok])
+        verb = mocker.Mock(return_value=unauthorized)
 
         result = client._authed_request(verb, 'http://x/api', 10)
 
-        assert result is ok
-        assert verb.call_count == 2
+        assert result is unauthorized
+        verb.assert_called_once()
         invalidate_mock.assert_called_once()
-
-    def test_401_retry_still_fails(self, full_env, mocker, response_factory):
-        client = make_client(mocker, full_env)
-        mocker.patch.object(client.auth, 'invalidate')
-
-        unauthorized1 = response_factory(status_code=401, text='unauthorized')
-        unauthorized2 = response_factory(status_code=403, text='still unauthorized')
-        verb = mocker.Mock(side_effect=[unauthorized1, unauthorized2])
-
-        result = client._authed_request(verb, 'http://x/api', 10)
-
-        assert result is unauthorized2
-        assert verb.call_count == 2
 
     def test_transport_error_short_circuits(self, full_env, mocker):
         client = make_client(mocker, full_env)
@@ -232,20 +217,16 @@ class TestSendCommand:
         assert excinfo.value.status_code == 403
         assert 'forbidden target' in str(excinfo.value)
 
-    def test_retries_once_on_401_then_succeeds(self, full_env, mocker, response_factory):
-        """A 401 on the first attempt should invalidate the token and retry
-        once, succeeding on the second attempt."""
+    def test_401_is_not_retried(self, full_env, mocker, response_factory):
         client = make_client(mocker, full_env)
         unauthorized = response_factory(status_code=401, json_data={'error': 'unauthorized'})
-        success = response_factory(status_code=200, json_data={'result': 'ok'})
-        post_mock = mocker.patch('ing_lib_cosmos.cosmos.requests.post',
-                                  side_effect=[unauthorized, success])
+        post_mock = mocker.patch('ing_lib_cosmos.cosmos.requests.post', return_value=unauthorized)
         invalidate_spy = mocker.spy(client.auth, 'invalidate')
 
-        result = client.send_command('TGT CMD', 'ENABLED')
+        with pytest.raises(CosmosRequestError):
+            client.send_command('TGT CMD', 'ENABLED')
 
-        assert result == 'ok'
-        assert post_mock.call_count == 2
+        post_mock.assert_called_once()
         invalidate_spy.assert_called_once()
 
 
@@ -443,12 +424,15 @@ class TestStartScript:
         client = make_client(mocker, full_env)
         lock_response = response_factory(status_code=200, text='')
         run_response = response_factory(status_code=200, text='123')
-        mocker.patch.object(client.session, 'post', side_effect=[lock_response, run_response])
+        session_post = mocker.patch.object(
+            client.session, 'post', side_effect=[lock_response, run_response]
+        )
 
         result = client.start_script('TARGET/procedures/script.py')
 
         assert result['script_id'] == 123
         assert result['running'] is True
+        assert session_post.call_args_list[1].kwargs['timeout'] == RUN_TIMEOUT
 
     def test_run_non_numeric_falls_back_to_json_error(self, full_env, mocker, response_factory):
         client = make_client(mocker, full_env)
@@ -499,7 +483,7 @@ class TestStartScript:
         import requests as real_requests
         from ing_lib_cosmos.cosmos import CosmosTimeoutError
         lock_response = response_factory(status_code=200, text='')
-        session_post = mocker.patch.object(
+        mocker.patch.object(
             client.session, 'post', side_effect=[lock_response, real_requests.exceptions.Timeout()]
         )
 

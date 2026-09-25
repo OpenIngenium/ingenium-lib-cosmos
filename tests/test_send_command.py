@@ -62,7 +62,9 @@ class TestMain:
 
         send_command.main()
 
-        client.send_command.assert_called_once_with('TGT CMD', 'ENABLED')
+        client.send_command.assert_called_once_with('TGT CMD with PARAM1 5', 'ENABLED')
+        client.get_cmd_cnt.assert_called_once_with('TGT', 'CMD')
+        client.get_cmd_time.assert_called_once_with('TGT', 'CMD')
 
     def test_success_path_sets_status_and_outputs(self, mocker, mock_io):
         set_input(mocker, [make_entry()])
@@ -146,21 +148,17 @@ class TestMain:
         assert entry['entry_outputs']['cmd_status'] == 'success'
         assert entry['entry_outputs']['timestamp'] == 'N/A'
 
-    def test_malformed_command_string_raises_indexerror(self, mocker, mock_io):
-        """
-        Known edge case: command_string parsing assumes a '__' separator and
-        a 'with' keyword. A malformed string (missing '__') raises
-        IndexError before any client call is made, propagating out of
-        main() uncaught. Documents current behavior rather than assuming a
-        fix.
-        """
+    def test_malformed_command_string_marks_entry_fail(self, mocker, mock_io):
         set_input(mocker, [make_entry(command_string='TGT CMD with PARAM1 5')])
         client = mocker.Mock()
         mocker.patch.object(send_command, 'CosmosAPIClient', return_value=client)
 
-        with pytest.raises(IndexError):
-            send_command.main()
+        send_command.main()
 
+        output = last_output_dict(mock_io)
+        entry = output['entries'][0]
+        assert entry['verification_status'] == 'FAIL'
+        assert entry['entry_outputs']['cmd_status'] == 'fail'
         client.send_command.assert_not_called()
 
     def test_no_entries_status_pass(self, mocker, mock_io):

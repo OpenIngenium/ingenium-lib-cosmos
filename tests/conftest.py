@@ -4,7 +4,6 @@ Shared pytest fixtures for the ing_lib_cosmos test suite.
 import sys
 import os
 import json
-import importlib
 from unittest.mock import MagicMock
 
 import pytest

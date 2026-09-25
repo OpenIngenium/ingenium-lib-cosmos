@@ -161,7 +161,7 @@ class TestMain:
         assert entry['verification_status'] == 'FAIL'
         assert output['custom_script_status'] == 'FAIL'
 
-    def test_input_error_marks_all_entries_error(self, mocker, mock_io):
+    def test_input_error_marks_entries_error_with_schema_preserved(self, mocker, mock_io):
         telem_a = 'TESTPKT__GENERIC/CHANNEL_THREE__FIELD_C'
         telem_b = 'TESTPKT__GENERIC/CHANNEL_FOUR__FIELD_D'
         set_input(mocker, [make_entry(telem_name=telem_a), make_entry(telem_name=telem_b)])
@@ -169,15 +169,18 @@ class TestMain:
         mocker.patch.object(query_telem, 'verify_wait_telemetry',
                              side_effect=InputError('bad query'))
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
         assert output['entries'][1]['verification_status'] == 'ERROR'
-        assert 'bad query' in output['entries'][0]['entry_outputs']['comparison_result']
+        assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time'}
+        assert 'bad query' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
-    def test_conflicting_dn_eu_for_same_telem_name_marks_all_entries_error(self, mocker, mock_io):
+    def test_conflicting_dn_eu_for_same_telem_name_marks_entries_error(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [
             make_entry(telem_name=telem_name, dn_eu='DN'),
@@ -186,8 +189,10 @@ class TestMain:
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
         assert output['entries'][1]['verification_status'] == 'ERROR'
@@ -195,31 +200,37 @@ class TestMain:
         # Should fail fast, before ever issuing the telemetry query
         verify_mock.assert_not_called()
 
-    def test_invalid_dn_eu_marks_all_entries_error(self, mocker, mock_io):
+    def test_invalid_dn_eu_marks_entries_error(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [make_entry(telem_name=telem_name, dn_eu='BOGUS')])
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
         assert output['custom_script_status'] == 'ERROR'
         verify_mock.assert_not_called()
 
-    def test_cosmos_error_marks_all_entries_error(self, mocker, mock_io):
+    def test_cosmos_error_marks_entries_error_with_schema_preserved(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [make_entry(telem_name=telem_name)])
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         mocker.patch.object(query_telem, 'verify_wait_telemetry',
                              side_effect=IngeniumCosmosError('cosmos down'))
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         output = last_output_dict(mock_io)
         entry = output['entries'][0]
         assert entry['verification_status'] == 'ERROR'
+        assert set(entry['entry_outputs']) == {'actual_value', 'telem_time'}
+        assert 'cosmos down' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
     def test_verify_on_change_passes_prior_value_from_states(self, mocker, mock_io):
@@ -325,8 +336,10 @@ class TestMain:
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         verify_mock.assert_not_called()
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
@@ -373,15 +386,17 @@ class TestMain:
         assert start_time.second == 1
         assert start_time.tzinfo is not None
 
-    def test_invalid_start_time_marks_all_entries_error(self, mocker, mock_io):
+    def test_invalid_start_time_marks_entries_error(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [make_entry(telem_name=telem_name)],
                   inputs={'start_time': 'not-a-date', 'timeout': 60, 'lookback': 0})
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
 
-        query_telem.main()
+        with pytest.raises(SystemExit) as excinfo:
+            query_telem.main()
 
+        assert excinfo.value.code == -1
         verify_mock.assert_not_called()
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'

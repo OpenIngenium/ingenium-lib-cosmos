@@ -10,6 +10,7 @@ from ing_lib_cosmos.cosmos import (
     split_channel_name, build_query_dict,
     build_query_telemetry_item, build_packet_timeformatted_item,
     cosmos_telemetry_query_func, validate_dn_eu,
+    CosmosConnectionError, CosmosRequestError,
 )
 
 
@@ -288,6 +289,64 @@ class TestMakeHistoricalTelemetryQueryFunc:
 
         assert result[channel_a][0] == {'time': '2026-01-01T00:00:00Z', 'eng_value': 1}
         assert result[channel_b][0] == {'time': '2026-01-01T00:00:05Z', 'eng_value': 2}
+
+    def test_query_failure_propagates(self):
+        channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'
+        client = FakeHistoricalClient(error=CosmosConnectionError('cosmos down'))
+        func = cosmos_telemetry_query_func(client, {channel_name: 'EU'})
+
+        with pytest.raises(CosmosConnectionError, match='cosmos down'):
+            func([channel_name], 10, 0, '2026-01-01T00:00:00Z', None)
+
+    def test_prefix_overlapping_packet_names_are_not_conflated(self):
+        channel_a = 'TESTPKT__FSW/HK__A'
+        channel_b = 'TESTPKT__FSW/HK_EXTENDED__B'
+        client = FakeHistoricalClient(rows=[
+            sample(1, '2026-01-01T00:00:00Z', 2, '2026-01-01T00:00:05Z'),
+        ])
+        func = cosmos_telemetry_query_func(client, {channel_a: 'EU', channel_b: 'EU'})
+
+        result = func([channel_a, channel_b], 10, 0, '2026-01-01T00:00:00Z', None)
+
+        assert result[channel_a][0] == {'time': '2026-01-01T00:00:00Z', 'eng_value': 1}
+        assert result[channel_b][0] == {'time': '2026-01-01T00:00:05Z', 'eng_value': 2}
+
+    def test_ragged_series_raises(self):
+        channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'
+        client = FakeHistoricalClient(rows=[sample(1)])
+        func = cosmos_telemetry_query_func(client, {channel_name: 'EU'})
+
+        with pytest.raises(CosmosRequestError, match='requested items'):
+            func([channel_name], 10, 0, '2026-01-01T00:00:00Z', None)
+
+    def test_empty_cell_raises(self):
+        channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'
+        client = FakeHistoricalClient(rows=[
+            [[], ['2026-01-01T00:00:00Z']],
+        ])
+        func = cosmos_telemetry_query_func(client, {channel_name: 'EU'})
+
+        with pytest.raises(CosmosRequestError, match='invalid value'):
+            func([channel_name], 10, 0, '2026-01-01T00:00:00Z', None)
+
+    def test_duplicate_channel_does_not_duplicate_samples(self):
+        channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'
+        client = FakeHistoricalClient(rows=[sample(1, '2026-01-01T00:00:00Z', 1)])
+        func = cosmos_telemetry_query_func(client, {channel_name: 'EU'})
+
+        result = func([channel_name, channel_name], 10, 0, '2026-01-01T00:00:00Z', None)
+
+        assert result[channel_name] == [
+            {'time': '2026-01-01T00:00:00Z', 'eng_value': 1},
+        ]
+
+    def test_invalid_dn_eu_raises(self):
+        channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'
+        client = FakeHistoricalClient()
+        func = cosmos_telemetry_query_func(client, {channel_name: 'BOGUS'})
+
+        with pytest.raises(ValueError, match='dn_eu'):
+            func([channel_name], 10, 0, '2026-01-01T00:00:00Z', None)
 
     def test_multiple_samples_all_included_in_order(self):
         channel_name = 'TESTPKT__GENERIC/CHANNEL_ONE__A'

@@ -8,7 +8,7 @@ step's control flow and use of ing_lib_cosmos.cosmos's exception-based API.
 import pytest
 
 import halt_all_scripts
-from ing_lib_cosmos.cosmos import IngeniumCosmosError, CosmosRequestError
+from ing_lib_cosmos.cosmos import CosmosRequestError
 
 
 @pytest.fixture(autouse=True)

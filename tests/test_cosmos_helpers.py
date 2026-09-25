@@ -69,29 +69,29 @@ class TestResolveEnvParam:
 
 
 # ---------------------------------------------------------------------------
-# _extract_jsonrpc_error / _extract_jsonrpc_error_message
+# _format_jsonrpc_error / _extract_jsonrpc_error_message
 # ---------------------------------------------------------------------------
 
 class TestExtractJsonRpcError:
     def test_no_error_key(self):
-        assert cosmos._extract_jsonrpc_error({'result': 'ok'}) is None
+        assert cosmos._format_jsonrpc_error({'result': 'ok'}) is None
 
     def test_error_key_present_dict_message(self):
         parsed = {'error': {'message': 'boom'}}
-        assert cosmos._extract_jsonrpc_error(parsed) == 'RPC Error: boom'
+        assert cosmos._format_jsonrpc_error(parsed) == 'RPC Error: boom'
 
     def test_error_with_nested_data_message(self):
         parsed = {'error': {'message': 'boom', 'data': {'message': 'inner detail'}}}
-        result = cosmos._extract_jsonrpc_error(parsed)
+        result = cosmos._format_jsonrpc_error(parsed)
         assert result == 'RPC Error: boom - Data Error: inner detail'
 
     def test_error_not_a_dict(self):
         parsed = {'error': 'just a string'}
-        result = cosmos._extract_jsonrpc_error(parsed)
+        result = cosmos._format_jsonrpc_error(parsed)
         assert result == 'RPC Error: just a string'
 
     def test_parsed_not_a_dict(self):
-        assert cosmos._extract_jsonrpc_error(['not', 'a', 'dict']) is None
+        assert cosmos._format_jsonrpc_error(['not', 'a', 'dict']) is None
 
 
 class TestExtractJsonRpcErrorMessage:
