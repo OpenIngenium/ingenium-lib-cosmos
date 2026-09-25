@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Ingenium custom script: query_telem.py
 

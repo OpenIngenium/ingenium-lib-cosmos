@@ -1,6 +1,5 @@
-#!/proj/icms/svitenv/bin/python
 """
-Ingenium custom script: cosmos_send_command.py
+Ingenium custom script: send_command.py
 
 This script sends commands to OpenC3 COSMOS via the JSON-RPC API.
 It can send one or multiple commands and verify their execution.

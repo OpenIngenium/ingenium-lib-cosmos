@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Ingenium custom script: halt_all_scripts.py
 

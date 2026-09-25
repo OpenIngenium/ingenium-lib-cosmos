@@ -1,6 +1,5 @@
 """
-COSMOS Authentication Module
-Handles token generation and refresh for OpenC3 COSMOS
+COSMOS Library - handles interaction with OpenC3 COSMOS and Ingenium steps
 """
 
 import os
@@ -1375,7 +1374,7 @@ def split_channel_name(channel_name: str) -> Tuple[str, str, str]:
     (target, packet, tlm_point) components.
 
     Args:
-        channel_name: e.g. "MIRA__PRIM/DEFAULTBEACON__ROCKET_STATE.CURRENT_STATE"
+        channel_name: e.g. "TGT__PACKET__TELEMPOINT"
 
     Returns:
         (target, packet, tlm_point)
@@ -1445,7 +1444,7 @@ def build_query_telemetry_item(target: str, packet: str, tlm_point: str, dn_eu: 
         dn_eu: 'DN' (raw) or 'EU' (converted)
 
     Returns:
-        The item string, e.g. "MIRA PRIM/DEFAULTBEACON ROCKET_STATE.CURRENT_STATE__RAW"
+        The item string, e.g. "TGT__PACKET__TELEMPOINT"
         for DN, or "...__CONVERTED" for EU.
 
     Raises:
@@ -1472,7 +1471,7 @@ def build_packet_timeformatted_item(target: str, packet: str) -> str:
         packet: Packet name
 
     Returns:
-        The item string, e.g. "MIRA__PRIM/DEFAULTBEACON__PACKET_TIMEFORMATTED__RAW"
+        The item string, e.g. "TGT__PACKET__TELEMPOINT"
     """
     return f"{target}__{packet}__PACKET_TIMEFORMATTED__RAW"
 
