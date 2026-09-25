@@ -6,6 +6,7 @@ def get_dependencies():
     deps=[
         'requests>=2.31.0',
         'urllib3>=1.26.0',
+        'ing_lib @ git+https://github.com/OpenIngenium/ingenium-lib.git@v0.1.0',
     ]
     return deps
 
