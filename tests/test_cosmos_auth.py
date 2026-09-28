@@ -6,7 +6,27 @@ import pytest
 
 from ing_lib_cosmos.cosmos import (
     CosmosAuth, AUTH_MODE_CORE, AUTH_MODE_ENTERPRISE, CosmosAuthError,
+    _sanitize_response_text,
 )
+
+
+# ---------------------------------------------------------------------------
+# Logging safety
+# ---------------------------------------------------------------------------
+
+class TestLoggingSafety:
+    def test_auth_response_is_redacted(self):
+        body = '{"access_token":"access","refresh_token":"refresh"}'
+
+        assert _sanitize_response_text(body, 'http://cosmos/auth/token') == '<redacted>'
+
+    def test_sensitive_json_fields_are_redacted(self):
+        body = '{"result":{"token":"secret","value":1}}'
+
+        sanitized = _sanitize_response_text(body, 'http://cosmos/api')
+
+        assert 'secret' not in sanitized
+        assert '"value": 1' in sanitized
 
 
 # ---------------------------------------------------------------------------

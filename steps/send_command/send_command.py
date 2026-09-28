@@ -133,7 +133,8 @@ def main():
     try:
         client = CosmosAPIClient()
     except Exception as e:
-        logger.info(f'Failed to initialize COSMOS client: {e}')
+        logger.debug('COSMOS client initialization exception details', exc_info=True)
+        logger.error(f'Failed to initialize COSMOS client: {e}')
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
         sys.exit(-1)
@@ -144,9 +145,13 @@ def main():
 
     # Process each command entry
     for i, entry in enumerate(entries):
-        logger.info(f'\nProcessing command {i+1} of {len(entries)}')
+        logger.info(f'Processing command {i+1} of {len(entries)}')
         
         process_command_entry(client, entry)
+        logger.info(
+            'Command completed: entry=%s/%s status=%s',
+            i + 1, len(entries), entry.get('verification_status'),
+        )
 
         logger.debug(f'Entry {i+1} processed: {entry}')
 

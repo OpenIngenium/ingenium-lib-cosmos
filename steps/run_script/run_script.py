@@ -53,7 +53,8 @@ def main():
     try:
         client = CosmosAPIClient()
     except Exception as e:
-        logger.info(f'Failed to initialize COSMOS client: {e}')
+        logger.debug('COSMOS client initialization exception details', exc_info=True)
+        logger.error(f'Failed to initialize COSMOS client: {e}')
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
         sys.exit(-1)
@@ -151,7 +152,7 @@ def main():
                 logger.info("  ✓ Script execution successful")
             else:
                 entry['verification_status'] = 'FAIL'
-                logger.info(f"  ✗ Script execution failed: {result.get('state')}")
+                logger.warning(f"Script execution failed: script_id={script_id} state={result.get('state')}")
 
         else:
 

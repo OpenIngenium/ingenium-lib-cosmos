@@ -178,7 +178,8 @@ def main():
     try:
         client = CosmosAPIClient()
     except Exception as e:
-        logger.info(f'Failed to initialize COSMOS client: {e}')
+        logger.debug('COSMOS client initialization exception details', exc_info=True)
+        logger.error(f'Failed to initialize COSMOS client: {e}')
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
         sys.exit(-1)
@@ -201,6 +202,10 @@ def main():
         sys.exit(-1)
 
     output_summary = ''
+    logger.info(
+        'Starting telemetry verification: channels=%s timeout=%s lookback=%s',
+        len(entries), timeout, lookback,
+    )
 
     if entries:
         telemetry_query_func = cosmos_telemetry_query_func(client, entry_map)
@@ -250,7 +255,12 @@ def main():
 
     # Report final custom_script_status
     write_output_file(output_dict, output_file_abs_path)
-    logger.info(f"Custom script completed with status: {custom_script_status}")
+    final_log = {
+        'PASS': logger.info,
+        'FAIL': logger.warning,
+        'ERROR': logger.error,
+    }[custom_script_status]
+    final_log('Custom script completed with status: %s', custom_script_status)
 
 
 if __name__ == '__main__':

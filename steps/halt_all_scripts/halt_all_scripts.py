@@ -52,7 +52,8 @@ def main():
     try:
         client = CosmosAPIClient()
     except Exception as e:
-        logger.info(f'Failed to initialize COSMOS client: {e}')
+        logger.debug('COSMOS client initialization exception details', exc_info=True)
+        logger.error(f'Failed to initialize COSMOS client: {e}')
         output_dict['custom_script_status'] = 'ERROR'
         write_output_file(output_dict, output_file_abs_path)
         sys.exit(-1)
@@ -134,7 +135,11 @@ def main():
     output_dict['output_summary'] = f"Halted {outputs['scripts_halted']} out of {outputs['scripts_running']} scripts running"
 
     # Report final custom_script_status
-    logger.info(f'\nFinal status: {custom_script_status}')
+    final_log = logger.info if custom_script_status == 'PASS' else logger.warning
+    final_log(
+        f'Final status: {custom_script_status} '
+        f'({outputs["scripts_halted"]}/{outputs["scripts_running"]} scripts halted)'
+    )
     write_output_file(output_dict, output_file_abs_path)
 
 if __name__ == '__main__':

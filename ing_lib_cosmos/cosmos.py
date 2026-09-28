@@ -8,7 +8,6 @@ import urllib3
 from typing import Tuple, Optional, Callable, List
 import requests
 import time
-import traceback
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
@@ -101,6 +100,39 @@ VALID_SCRIPT_FILTERS = (SCRIPT_FILTER_RUNNING, SCRIPT_FILTER_COMPLETED, SCRIPT_F
 
 _TRUE_STRINGS = {'true', '1', 'yes', 'on'}
 _FALSE_STRINGS = {'false', '0', 'no', 'off'}
+_LOG_REDACTED = '<redacted>'
+_LOG_BODY_LIMIT = 4096
+_LOG_SENSITIVE_KEYS = {
+    'access_token', 'authorization', 'password', 'refresh_token', 'token',
+}
+
+
+def _sanitize_log_value(value: Any) -> Any:
+    """Return a log-safe copy of a request/response value."""
+    if isinstance(value, dict):
+        return {
+            key: _LOG_REDACTED if str(key).lower() in _LOG_SENSITIVE_KEYS
+            else _sanitize_log_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_log_value(item) for item in value]
+    return value
+
+
+def _sanitize_response_text(text: str, url: str) -> str:
+    """Redact sensitive or excessively large response bodies before logging."""
+    if '/token' in url or '/auth/verify' in url:
+        return _LOG_REDACTED
+
+    try:
+        sanitized = json.dumps(_sanitize_log_value(json.loads(text)))
+    except (TypeError, ValueError):
+        sanitized = text
+
+    if len(sanitized) > _LOG_BODY_LIMIT:
+        return f'{sanitized[:_LOG_BODY_LIMIT]}...<truncated>'
+    return sanitized
 
 
 def _resolve_bool_env_param(param_value: Optional[bool], env_var_name: str, default: bool = True) -> bool:
@@ -239,7 +271,10 @@ def _parse_jsonrpc(response: requests.Response, failure_message_prefix: str) -> 
     try:
         json_response = response.json()
     except ValueError:
-        logger.error(f"Failed to parse JSON response (status {response.status_code}): {response.text}")
+        logger.error(
+            "Failed to parse JSON response (status %s): %s",
+            response.status_code, _sanitize_response_text(response.text, ""),
+        )
         raise CosmosRequestError('Failed to parse JSON response', status_code=response.status_code,
                                   response_text=response.text)
 
@@ -252,7 +287,10 @@ def _parse_jsonrpc(response: requests.Response, failure_message_prefix: str) -> 
         raise CosmosRPCError(f"{failure_message_prefix}: {error_message}", status_code=response.status_code,
                               response_text=response.text, rpc_error=error)
     else:
-        logger.error(f"Unexpected response format (status {response.status_code}): {response.text}")
+        logger.error(
+            "Unexpected response format (status %s): %s",
+            response.status_code, _sanitize_response_text(response.text, ""),
+        )
         raise CosmosRequestError('Unexpected response format', status_code=response.status_code,
                                   response_text=response.text)
 
@@ -277,9 +315,20 @@ def _request(verb: Callable[..., requests.Response], url: str, timeout: int,
         CosmosConnectionError: If a connection could not be established
         IngeniumCosmosError: On any other unexpected transport failure
     """
+    method = getattr(verb, '__name__', verb.__class__.__name__).upper()
+    sanitized_kwargs = _sanitize_log_value(kwargs)
+    logger.debug(
+        'COSMOS API request: method=%s url=%s timeout=%s kwargs=%s',
+        method, url, timeout, sanitized_kwargs,
+    )
+
     try:
         response = verb(url, timeout=timeout, **kwargs)
-        logger.debug(f"COSMOS API response [{response.status_code}] {url}: {response.text}")
+        logger.debug(
+            'COSMOS API response: method=%s url=%s status=%s body=%s',
+            method, url, response.status_code,
+            _sanitize_response_text(response.text, url),
+        )
         return response
     except requests.exceptions.Timeout:
         message = f'Connection to {url} timed out after {timeout} seconds'
@@ -292,7 +341,8 @@ def _request(verb: Callable[..., requests.Response], url: str, timeout: int,
     except (CosmosTimeoutError, CosmosConnectionError):
         raise
     except Exception as e:
-        logger.error(f"Unexpected error during request to {url}: {e}\n{traceback.format_exc()}")
+        logger.debug('Unexpected request exception details', exc_info=True)
+        logger.error('Unexpected error during request to %s: %s', url, e)
         raise IngeniumCosmosError(f'Unexpected error during request to {url}: {e}') from e
 
 
@@ -397,7 +447,9 @@ class CosmosAuth:
             message = f"Authentication failed: {response.status_code}"
             if rpc_message:
                 message += f': {rpc_message}'
-            logger.error(f"{message} - {response.text}")
+            logger.error(
+                "%s - %s", message, _sanitize_response_text(response.text, "")
+            )
             raise CosmosAuthError(message, status_code=response.status_code)
 
     def refresh_access_token(self) -> str:
@@ -443,7 +495,9 @@ class CosmosAuth:
             message = f"Token refresh failed: {response.status_code}"
             if rpc_message:
                 message += f': {rpc_message}'
-            logger.error(f"{message} - {response.text}")
+            logger.error(
+                "%s - %s", message, _sanitize_response_text(response.text, "")
+            )
             raise CosmosAuthError(message, status_code=response.status_code)
 
     def get_valid_token(self) -> str:
@@ -523,7 +577,9 @@ class CosmosAuth:
             message = f"Authentication failed: {response.status_code}"
             if rpc_message:
                 message += f': {rpc_message}'
-            logger.error(f"{message} - {response.text}")
+            logger.error(
+                "%s - %s", message, _sanitize_response_text(response.text, "")
+            )
             raise CosmosAuthError(message, status_code=response.status_code)
 
 
@@ -708,7 +764,7 @@ class CosmosAPIClient:
             if rpc_message:
                 message += f': {rpc_message}'
             logger.error(f"{message}")
-            logger.debug(f'{response.text}')
+            logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
             raise CosmosRequestError(message, status_code=response.status_code, response_text=response.text)
 
         result = _parse_jsonrpc(response, 'Command failed')
@@ -757,14 +813,14 @@ class CosmosAPIClient:
         response = self._authed_request(requests.post, url, timeout, json=json_rpc_payload, headers=self.headers,
                                          verify=self.verify_ssl)
 
-        logger.debug(f"Response status: {response.text}")
+        logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
         if response.status_code != 200:
             rpc_message = _extract_jsonrpc_error_message(response.text)
             error_msg = f"COSMOS API returned status {response.status_code}"
             if rpc_message:
                 error_msg += f': {rpc_message}'
             logger.error(f"{error_msg}")
-            logger.debug(f'{response.text}')
+            logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
             raise CosmosRequestError(error_msg, status_code=response.status_code, response_text=response.text)
 
         values = _parse_jsonrpc(response, 'Telemetry query failed')
@@ -814,9 +870,11 @@ class CosmosAPIClient:
         if end_time:
             json_rpc_payload["keyword_params"]["end_time"] = end_time
 
-        logger.debug(f"Querying COSMOS API: {url}")
-        logger.info(f"Querying COSMOS API: {json_rpc_payload}")
-        logger.debug(f"Telemetry values query: items={items}, start_time={start_time}, end_time={end_time}")
+        logger.debug("Querying COSMOS API: url=%s payload=%s", url, json_rpc_payload)
+        logger.debug(
+            "Telemetry values query: items=%s start_time=%s end_time=%s",
+            items, start_time, end_time,
+        )
 
         response = self._authed_request(requests.post, url, timeout, json=json_rpc_payload, headers=self.headers,
                                          verify=self.verify_ssl)
@@ -883,7 +941,7 @@ class CosmosAPIClient:
             if rpc_message:
                 error_msg += f': {rpc_message}'
             logger.error(f"{error_msg}")
-            logger.debug(f'{response.text}')
+            logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
             raise CosmosRequestError(error_msg, status_code=response.status_code, response_text=response.text)
 
         raw = _parse_jsonrpc(response, 'get_cmd_time failed')
@@ -953,7 +1011,7 @@ class CosmosAPIClient:
             if rpc_message:
                 error_msg += f': {rpc_message}'
             logger.error(f"{error_msg}")
-            logger.debug(f'{response.text}')
+            logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
             raise CosmosRequestError(error_msg, status_code=response.status_code, response_text=response.text)
 
         raw = _parse_jsonrpc(response, 'get_cmd_cnt failed')
@@ -1024,7 +1082,7 @@ class CosmosAPIClient:
             if rpc_message:
                 message += f': {rpc_message}'
             logger.error(f"{message}")
-            logger.debug(f'{response.text}')
+            logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
             raise CosmosRequestError(message, status_code=response.status_code, response_text=response.text)
 
         # Parse script ID
@@ -1135,6 +1193,7 @@ class CosmosAPIClient:
             raise ValueError(
                 f"Invalid script_filter '{script_filter}'; must be one of {VALID_SCRIPT_FILTERS}")
 
+        logger.info("Querying COSMOS scripts: filter=%s", script_filter)
         result: Dict[str, Any] = {}
 
         if script_filter in (SCRIPT_FILTER_RUNNING, SCRIPT_FILTER_BOTH):
@@ -1165,6 +1224,12 @@ class CosmosAPIClient:
                 raise CosmosRequestError("Could not parse completed-script list response",
                                           status_code=response.status_code, response_text=response.text)
 
+        logger.info(
+            "Retrieved COSMOS scripts: running=%s completed=%s",
+            len(result.get('running_scripts', [])),
+            len(result.get('completed_scripts', [])),
+        )
+        logger.debug("COSMOS script collection result: %s", result)
         return result
 
     def halt_script(self, script_id: int) -> Dict[str, Any]:
@@ -1206,7 +1271,7 @@ class CosmosAPIClient:
         if rpc_message:
             message += f': {rpc_message}'
         logger.error(f"{message}")
-        logger.debug(f'{response.text}')
+        logger.debug("Response body: %s", _sanitize_response_text(response.text, ""))
         raise CosmosScriptError(message, script_id=script_id)
 
     def monitor_script(self, script_id: int, timeout: int = DEFAULT_SCRIPT_TIMEOUT,
@@ -1252,7 +1317,10 @@ class CosmosAPIClient:
                 script = status['script']
                 state = status['state']
                 line_no = status['line_no']
-                logger.info(f"Status: {state}, Line: {line_no}")
+                logger.debug(
+                    "Script status: script_id=%s state=%s line_no=%s timeout_remaining=%s",
+                    script_id, state, line_no, timeout_remaining,
+                )
 
                 # Track if script progressed beyond spawning
                 if state in ['running', 'waiting', 'completed', 'done'] or line_no > 0:
