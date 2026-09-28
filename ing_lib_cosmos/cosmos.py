@@ -839,7 +839,7 @@ class CosmosAPIClient:
         filtered by command name, using the COSMOS get_cmd_time JSON-RPC API.
 
         Args:
-            target: Target name (e.g., "HANDLE")
+            target: Target name (e.g., "TGT")
             command: Optional command name to filter by (e.g., "ECHO"). If not
                 provided, COSMOS returns the time of the most recent command
                 sent to the target regardless of command name.
@@ -910,7 +910,7 @@ class CosmosAPIClient:
         filtered by command name, using the COSMOS get_cmd_cnt JSON-RPC API.
 
         Args:
-            target: Target name (e.g., "HANDLE")
+            target: Target name (e.g., "TGT")
             command: Optional command name to filter by (e.g., "ECHO"). If not
                 provided, COSMOS returns the total command count for the
                 target regardless of command name.
@@ -975,7 +975,7 @@ class CosmosAPIClient:
         script id. Use monitor_script() to wait for completion.
 
         Args:
-            script_name: Script name/path (e.g., "HANDLE/procedures/script.py")
+            script_name: Script name/path (e.g., "TGT/procedures/script.py")
             environment: Optional list of environment entries passed to the script
             lock: If True, lock the script before running it
 
