@@ -72,7 +72,7 @@ Each step directory also contains:
 - A COSMOS scope, such as `DEFAULT`.
 - Credentials appropriate for the selected authentication mode.
 - Network access to the COSMOS base URL.
-- The `ing_lib` package from the OpenIngenium repository. This repository currently pins it to tag `v0.1.0`.
+- The `ing_lib` package from the OpenIngenium repository. This repository currently pins it to tag `v0.1.1`.
 
 The package metadata advertises Python 3.10 through 3.14. CI tests the same versions.
 
