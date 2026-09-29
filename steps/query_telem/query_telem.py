@@ -19,7 +19,8 @@ logger = get_logger(__name__)
 
 from ing_lib.steps import (
     get_input_output_paths, read_input_file, write_output_file,
-    verify_wait_telemetry, InputError, get_telem_prior_value
+    verify_wait_telemetry, InputError, get_telem_prior_value,
+    translate_verification_conditions,
 )
 from ing_lib_cosmos.cosmos import (
     CosmosAPIClient, IngeniumCosmosError, cosmos_telemetry_query_func, build_query_dict,
@@ -60,16 +61,16 @@ def parse_start_time(start_time_raw):
 def parse_telem_name(telem_name_raw):
     """Extract and validate the canonical telemetry name from input CSV data.
 
-    The custom-script input stores telemetry metadata as ``telem_name,telem_id``.
+    The custom-script input stores telemetry metadata as ``telem_id,telem_name``.
     Only the telemetry name is used to build COSMOS queries; the ID remains in
     the original entry input for output compatibility.
     """
     if not isinstance(telem_name_raw, str):
         raise InputError(
-            f"Invalid telem_name {telem_name_raw!r}: expected 'telem_name,telem_id'"
+            f"Invalid telem_name {telem_name_raw!r}: expected 'telem_id,telem_name'"
         )
     logger.debug(f"telem_name_raw: {telem_name_raw}")
-    telem_name = telem_name_raw.split(',', 1)[0].strip()
+    telem_name = telem_name_raw.split(',', 1)[1].strip()
     logger.debug(f"telem_name: {telem_name}")
     if not telem_name:
         raise InputError(
@@ -124,6 +125,37 @@ def build_combined_query(input_dict, entries):
     return query, entry_map
 
 
+def format_verification_condition(verification_conditions):
+    """Translate an Ingenium verification condition into a display expression."""
+    translated = translate_verification_conditions(verification_conditions)
+    condition = translated['verification_condition']
+    values = translated['verification_values']
+    actual_value = '{actual_value}'
+
+    operators = {
+        'GREATER_THAN': '>',
+        'GREATER_THAN_OR_EQUAL': '>=',
+        'LESS_THAN': '<',
+        'LESS_THAN_OR_EQUAL': '<=',
+        'EQUAL': '==',
+        'NOT_EQUAL': '!=',
+    }
+    if condition in operators:
+        return f'{actual_value} {operators[condition]} {values[0]}'
+    if condition == 'CONTAINS':
+        return f'{values[0]} contained in {actual_value}'
+    if condition == 'INCLUSIVE_RANGE':
+        return f'{values[0]} <= {actual_value} <= {values[1]}'
+    if condition == 'EXCLUSIVE_RANGE':
+        return f'{values[0]} < {actual_value} < {values[1]}'
+    if condition == 'RECORD':
+        return f'Record {actual_value}'
+    if condition == 'NOT_PRESENT':
+        return f'telemetry is not present'
+
+    raise InputError(f'Unknown Verification Condition: {condition}')
+
+
 def apply_telem_result_to_entry(entry, telem_result):
     """
     Populate an entry's verification_status/entry_outputs from the channel_result
@@ -136,6 +168,9 @@ def apply_telem_result_to_entry(entry, telem_result):
     entry['verification_status'] = telem_result['verification_status']
     entry['entry_outputs']['actual_value'] = telem_result['actual_value']
     entry['entry_outputs']['telem_time'] = telem_details.get('time')
+    entry['entry_outputs']['telem_eval'] = format_verification_condition(
+        entry['entry_inputs']['verification_condition']
+    )
 
 
 # Main logic
@@ -165,7 +200,8 @@ def main():
         entry['verification_status'] = 'PENDING'
         entry['entry_outputs'] = {
             'actual_value': '',
-            'telem_time': ''
+            'telem_time': '',
+            'telem_eval': ''
         }
 
     # Write initial output
@@ -203,7 +239,7 @@ def main():
 
     output_summary = ''
     logger.info(
-        'Starting telemetry verification: channels=%s timeout=%s lookback=%s',
+        'Starting telemetry verification: telemetry_points=%s timeout=%s lookback=%s',
         len(entries), timeout, lookback,
     )
 

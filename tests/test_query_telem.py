@@ -29,6 +29,9 @@ def make_entry(telem_name='TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
                verify_wait='VERIFY', verify_on='VALUE', dn_eu='EU',
                verification_condition='EQUAL,INHIBIT,,',
                bit_mask=None, bit_op='NONE'):
+    if ',' not in telem_name:
+        telem_name = f'1234,{telem_name}'
+
     return {
         'entry_inputs': {
             'telem_name': telem_name,
@@ -76,6 +79,42 @@ def find_predict(query_arg, telem_name):
     return next(p for p in query_arg if p['telem_uuid'] == telem_name)
 
 
+@pytest.mark.parametrize(
+    'verification_condition, expected',
+    [
+        ('GREATER_THAN,3,,', '{actual_value} > 3'),
+        ('GREATER_THAN_OR_EQUAL,3,,', '{actual_value} >= 3'),
+        ('LESS_THAN,3,,', '{actual_value} < 3'),
+        ('LESS_THAN_OR_EQUAL,3,,', '{actual_value} <= 3'),
+        ('EQUAL,3,,', '{actual_value} == 3'),
+        ('NOT_EQUAL,3,,', '{actual_value} != 3'),
+        ('CONTAINS,READY,,', 'READY contained in {actual_value}'),
+        ('INCLUSIVE_RANGE,,3,7', '3 <= {actual_value} <= 7'),
+        ('EXCLUSIVE_RANGE,,3,7', '3 < {actual_value} < 7'),
+        ('RECORD,,,', 'Record {actual_value}'),
+        ('NOT_PRESENT,,,', 'telemetry is not present'),
+    ],
+)
+def test_format_verification_condition(verification_condition, expected):
+    assert query_telem.format_verification_condition(verification_condition) == expected
+
+
+def test_apply_telem_result_populates_telem_eval():
+    entry = make_entry(verification_condition='GREATER_THAN,3,,')
+    entry['entry_outputs'] = {
+        'actual_value': '',
+        'telem_time': '',
+        'telem_eval': '',
+    }
+
+    query_telem.apply_telem_result_to_entry(
+        entry,
+        make_predict_result('TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A', actual_value=4),
+    )
+
+    assert entry['entry_outputs']['telem_eval'] == '{actual_value} > 3'
+
+
 @pytest.fixture(autouse=True)
 def mock_io(mocker):
     """Mock the file I/O helpers used by main() so no real files are touched."""
@@ -96,7 +135,7 @@ def last_output_dict(write_mock):
 class TestMain:
     def test_build_combined_query_uses_canonical_name_for_uuid_and_entry_map(self):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
-        entries = [make_entry(telem_name=f'{telem_name},1234')]
+        entries = [make_entry(telem_name=f'1234,{telem_name}')]
 
         query, entry_map = query_telem.build_combined_query(make_input(entries), entries)
 
@@ -141,6 +180,7 @@ class TestMain:
         assert entry['verification_status'] == 'PASS'
         assert entry['entry_outputs']['actual_value'] == 'INHIBIT'
         assert entry['entry_outputs']['telem_time'] == '2026-01-01T00:00:00Z'
+        assert entry['entry_outputs']['telem_eval'] == '{actual_value} == INHIBIT'
         assert output['custom_script_status'] == 'PASS'
 
     def test_fail_case_sets_fail_status(self, mocker, mock_io):
@@ -176,7 +216,7 @@ class TestMain:
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
         assert output['entries'][1]['verification_status'] == 'ERROR'
-        assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time'}
+        assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time', 'telem_eval'}
         assert 'bad query' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
@@ -229,7 +269,7 @@ class TestMain:
         output = last_output_dict(mock_io)
         entry = output['entries'][0]
         assert entry['verification_status'] == 'ERROR'
-        assert set(entry['entry_outputs']) == {'actual_value', 'telem_time'}
+        assert set(entry['entry_outputs']) == {'actual_value', 'telem_time', 'telem_eval'}
         assert 'cosmos down' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
@@ -310,7 +350,7 @@ class TestMain:
         telem_id = '1234'
         set_input(
             mocker,
-            [make_entry(telem_name=f'{telem_name},{telem_id}', verify_on='CHANGE')],
+            [make_entry(telem_name=f'{telem_id},{telem_name}', verify_on='CHANGE')],
             states={'variables': {'channel_variables': {telem_name: 4}}},
         )
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
@@ -327,12 +367,28 @@ class TestMain:
         assert query_arg[0]['telem_uuid'] == telem_name
         assert query_arg[0]['prior_value'] == 4
         output = last_output_dict(mock_io)
-        assert output['entries'][0]['entry_inputs']['telem_name'] == f'{telem_name},{telem_id}'
+        assert output['entries'][0]['entry_inputs']['telem_name'] == f'{telem_id},{telem_name}'
         assert telem_name in output['output_summary']
         assert f'{telem_name},{telem_id}' not in output['output_summary']
 
+    def test_leading_csv_delimiter_is_normalized_for_query(self, mocker, mock_io):
+        telem_name = 'MIRA__PRIM/DEFAULTBEACON__META.PID'
+        set_input(mocker, [make_entry(telem_name=f',{telem_name}')])
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        verify_mock = mocker.patch.object(
+            query_telem, 'verify_wait_telemetry',
+            return_value=[make_results([
+                make_predict_result(telem_name, actual_value=1, verification_status='PASS'),
+            ])],
+        )
+
+        query_telem.main()
+
+        assert verify_mock.call_args[0][0][0]['telem_uuid'] == telem_name
+        assert last_output_dict(mock_io)['custom_script_status'] == 'PASS'
+
     def test_empty_csv_telem_name_marks_entry_error(self, mocker, mock_io):
-        set_input(mocker, [make_entry(telem_name=',1234')])
+        set_input(mocker, [make_entry(telem_name=',')])
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(query_telem, 'verify_wait_telemetry')
 

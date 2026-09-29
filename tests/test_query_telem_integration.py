@@ -8,7 +8,7 @@ from ing_lib_cosmos.cosmos import CosmosConnectionError
 def make_entry(telem_name, verification_condition='EQUAL,INHIBIT,,'):
     return {
         'entry_inputs': {
-            'telem_name': telem_name,
+            'telem_name': f'1234,{telem_name}',
             'verify_wait': 'VERIFY',
             'verify_on': 'VALUE',
             'dn_eu': 'EU',
@@ -49,6 +49,7 @@ def test_real_query_telem_pipeline_passes(mocker, mock_io):
     assert output['entries'][0]['verification_status'] == 'PASS'
     assert output['entries'][0]['entry_outputs']['actual_value'] == 'INHIBIT'
     assert output['entries'][0]['entry_outputs']['telem_time'] == '2026-01-01T00:00:00Z'
+    assert output['entries'][0]['entry_outputs']['telem_eval'] == '{actual_value} == INHIBIT'
 
 
 def test_real_pipeline_keeps_prefix_overlapping_packets_separate(mocker, mock_io):
@@ -87,5 +88,5 @@ def test_real_pipeline_marks_query_failure_error(mocker, mock_io):
     output = mock_io.call_args_list[-1].args[0]
     assert output['custom_script_status'] == 'ERROR'
     assert output['entries'][0]['verification_status'] == 'ERROR'
-    assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time'}
+    assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time', 'telem_eval'}
     assert 'cosmos down' in output['output_summary']

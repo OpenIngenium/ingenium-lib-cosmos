@@ -5,7 +5,6 @@
         <input_field name="start_time" description="The start time to query against (if none is provided the script will use the current time)." phase="AUTHORING" required="YES" type="TIME"></input_field>
         <input_field name="timeout" description="This, along with the start time, determines the time range to look for the telemetry value" phase="AUTHORING" required="YES" type="INT"></input_field>
         <input_field name="lookback" description="A negative offset on the start time to use in the query." phase="AUTHORING" required="YES" type="INT" default="0"></input_field>
-
         <script_entry>
             <input_field description="The telemetry name in format of <TARGET>__<PACKET>__<TELEMPOINT>" name="telem_name" phase="AUTHORING" required="YES" type="FLIGHT_TELEM"/>
             <input_field description="Check the first telemetry available (verify) or wait for values that match predict (wait)" name="verify_wait" phase="AUTHORING" required="YES" type="ENUM">
@@ -27,6 +26,7 @@
                     <enum symbolic="AND"></enum>
                     <enum symbolic="OR"></enum>
             </input_field>
+            <output_field description="Converts the verification condition result to a string (e.g. EQUAL,3,, to 3={actual_value})" name="telem_eval" type="STRING"/>
             <output_field description="The actual telemetry value retrieved from COSMOS" name="actual_value" type="STRING"/>
             <output_field description="The timestamp when the telemetry value was retrieved" name="telem_time" type="STRING"/>
         </script_entry>
@@ -50,12 +50,8 @@
             <entry_section>
                 <section_header>
                     <layout_display>
-                        <template template="Query for: {telem_name} and check "></template>
-                        <layout row="1" column="1" width="6" height="1" align="LEFT"></layout>
-                    </layout_display>
-                    <layout_display>
-                        <template template="Query for: {telem_name} and check "></template>
-                        <layout row="1" column="1" width="6" height="1" align="LEFT"></layout>
+                        <template template="Query for: {telem_name[1]} and check  "></template>
+                        <layout row="1" column="1" width="10" height="1" align="LEFT"></layout>
                     </layout_display>
                     <icon icon_type="STATUS">
                         <mouseover_display>

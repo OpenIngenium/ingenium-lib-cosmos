@@ -17,7 +17,7 @@ def make_input(entries):
     return {'entries': entries}
 
 
-def make_entry(script_name='TARGET/procedures/script.py', wait_for_completion=True, timeout=5):
+def make_entry(script_name='TARGET/procedures/script.py', wait_for_completion='true', timeout=5):
     return {
         'entry_inputs': {
             'script_name': script_name,
@@ -70,7 +70,7 @@ class TestMain:
         assert output['custom_script_status'] == 'FAIL'
 
     def test_wait_for_completion_success_marks_pass(self, mocker, mock_io):
-        set_input(mocker, [make_entry(wait_for_completion=True)])
+        set_input(mocker, [make_entry(wait_for_completion='true')])
         snapshots = []
         mock_io.side_effect = lambda output, _: snapshots.append(copy.deepcopy(output))
         client = mocker.Mock()
@@ -103,7 +103,7 @@ class TestMain:
         client.monitor_script.assert_called_once_with(42, timeout=5)
 
     def test_wait_for_completion_failure_marks_fail(self, mocker, mock_io):
-        set_input(mocker, [make_entry(wait_for_completion=True)])
+        set_input(mocker, [make_entry(wait_for_completion='true')])
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 42, 'running': True}
         client.monitor_script.return_value = iter([
@@ -119,7 +119,7 @@ class TestMain:
         assert output['custom_script_status'] == 'FAIL'
 
     def test_monitor_script_raises_marks_fail(self, mocker, mock_io):
-        set_input(mocker, [make_entry(wait_for_completion=True)])
+        set_input(mocker, [make_entry(wait_for_completion='true')])
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 42, 'running': True}
 
@@ -139,7 +139,7 @@ class TestMain:
 
     def test_missing_timeout_uses_default_and_continues(self, mocker, mock_io):
         invalid_entry = make_entry(script_name='bad.py', timeout='not-an-int')
-        valid_entry = make_entry(script_name='good.py', wait_for_completion=False)
+        valid_entry = make_entry(script_name='good.py', wait_for_completion='false')
         del valid_entry['entry_inputs']['timeout']
         set_input(mocker, [invalid_entry, valid_entry])
         client = mocker.Mock()
@@ -157,7 +157,7 @@ class TestMain:
         client.start_script.assert_called_once_with('good.py')
 
     def test_no_wait_found_marks_pass(self, mocker, mock_io):
-        set_input(mocker, [make_entry(wait_for_completion=False)])
+        set_input(mocker, [make_entry(wait_for_completion='false')])
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 7, 'running': True}
         client.get_script.return_value = {
@@ -174,7 +174,7 @@ class TestMain:
         assert output['custom_script_status'] == 'PASS'
 
     def test_no_wait_not_found_marks_fail(self, mocker, mock_io):
-        set_input(mocker, [make_entry(wait_for_completion=False)])
+        set_input(mocker, [make_entry(wait_for_completion='false')])
         client = mocker.Mock()
         client.start_script.return_value = {'script_id': 7, 'running': True}
         client.get_script.return_value = {
@@ -192,8 +192,8 @@ class TestMain:
 
     def test_multiple_entries_mixed_results(self, mocker, mock_io):
         set_input(mocker, [
-            make_entry(script_name='a.py', wait_for_completion=True),
-            make_entry(script_name='b.py', wait_for_completion=True),
+            make_entry(script_name='a.py', wait_for_completion='true'),
+            make_entry(script_name='b.py', wait_for_completion='true'),
         ])
         client = mocker.Mock()
         client.start_script.side_effect = [
