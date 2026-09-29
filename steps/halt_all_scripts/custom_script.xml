@@ -18,7 +18,7 @@
                 <section_header>
                     <layout_display>
                         <template template="Scripts Running: {scripts_running} - Scripts Halted: {scripts_halted}"></template>
-                        <layout row="1" column="1" width="6" height="1" align="CENTER"></layout>
+                        <layout row="1" column="1" width="6" height="1" align="LEFT"></layout>
                     </layout_display>
                 </section_header>
                 <section_results>

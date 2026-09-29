@@ -42,7 +42,7 @@
                             <mouseover_element field_name="start_line_no" display_name="Start Line"></mouseover_element>
                             <mouseover_element field_name="end_line_no" display_name="End Line"></mouseover_element>
                         </mouseover_display>
-                        <layout row="1" column="11" width="1" height="1" align="RIGHT"></layout>
+                        <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
                     </icon>
                 </section_header>
                 <section_content>
