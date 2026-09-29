@@ -477,6 +477,62 @@ class TestMain:
         assert telem_a in output['output_summary']
         assert telem_b in output['output_summary']
 
+    def test_channel_variables_updated_with_latest_actual_values(self, mocker, mock_io):
+        telem_a = 'TESTPKT__GENERIC/CHANNEL_THREE__FIELD_C'
+        telem_b = 'TESTPKT__GENERIC/CHANNEL_FOUR__FIELD_D'
+        set_input(
+            mocker,
+            [make_entry(telem_name=f'1234,{telem_a}'), make_entry(telem_name=telem_b)],
+            states={'variables': {}, 'channel_variables': {telem_a: 'OLD'}},
+        )
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        mocker.patch.object(
+            query_telem, 'verify_wait_telemetry',
+            return_value=[make_results([
+                make_predict_result(telem_a, actual_value='INHIBIT', verification_status='PASS'),
+                make_predict_result(telem_b, actual_value='INHIBIT', verification_status='PASS'),
+            ])],
+        )
+
+        query_telem.main()
+
+        output = last_output_dict(mock_io)
+        assert output['states']['channel_variables'] == {
+            telem_a: 'INHIBIT',
+            telem_b: 'INHIBIT',
+        }
+
+    def test_channel_variables_created_when_absent_from_input_states(self, mocker, mock_io):
+        telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
+        set_input(mocker, [make_entry(telem_name=telem_name)])
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        mocker.patch.object(
+            query_telem, 'verify_wait_telemetry',
+            return_value=[make_results([
+                make_predict_result(telem_name, actual_value=42, verification_status='PASS'),
+            ])],
+        )
+
+        query_telem.main()
+
+        assert last_output_dict(mock_io)['states']['channel_variables'] == {telem_name: 42}
+
+    def test_channel_variables_preserved_when_no_value_returned(self, mocker, mock_io):
+        telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
+        set_input(mocker, [make_entry(telem_name=telem_name)],
+                  states={'channel_variables': {telem_name: 'OLD'}})
+        mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
+        mocker.patch.object(
+            query_telem, 'verify_wait_telemetry',
+            return_value=[make_results([
+                make_predict_result(telem_name, actual_value='', verification_status='FAIL'),
+            ])],
+        )
+
+        query_telem.main()
+
+        assert last_output_dict(mock_io)['states']['channel_variables'] == {telem_name: 'OLD'}
+
     def test_write_output_file_called_after_each_snapshot(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
         set_input(mocker, [make_entry(telem_name=telem_name)])

@@ -482,6 +482,20 @@ Important fields:
 
 The step writes `actual_value` and `telem_time` for every entry while polling. It writes intermediate output snapshots so a long-running `WAIT` operation can be observed. Input errors or telemetry verification failures mark entries as `ERROR` and terminate with overall `ERROR`.
 
+Once polling completes, the step publishes each entry's latest value to `states.channel_variables`, keyed by canonical telemetry name. Entries that never produced a value leave any existing state entry untouched.
+
+```json
+{
+  "states": {
+    "channel_variables": {
+      "TARGET__PACKET__ITEM": 4
+    }
+  }
+}
+```
+
+Note that the prior value used for `verify_on: CHANGE` is read from `states.variables.channel_variables` by `ing_lib.steps.get_telem_prior_value`, which is a different location than where this output is written.
+
 ### `run_script`
 
 Run it with:

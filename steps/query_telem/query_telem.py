@@ -156,6 +156,25 @@ def format_verification_condition(verification_conditions, actual_value):
     raise InputError(f'Unknown Verification Condition: {condition}')
 
 
+def update_channel_variables(output_dict, entries):
+    """
+    Record each entry's latest actual value in the output's
+    ``states['channel_variables']`` map, keyed by canonical telemetry name.
+
+    Entries without a value (never populated, e.g. NOT_PRESENT or an aborted
+    verification) are skipped so an existing prior value is not clobbered.
+
+    Updates output_dict in place.
+    """
+    channel_variables = output_dict.setdefault('states', {}).setdefault('channel_variables', {})
+
+    for entry in entries:
+        actual_value = entry.get('entry_outputs', {}).get('actual_value', '')
+        if actual_value == '':
+            continue
+        channel_variables[parse_telem_name(entry['entry_inputs']['telem_name'])] = actual_value
+
+
 def apply_telem_result_to_entry(entry, telem_result):
     """
     Populate an entry's verification_status/entry_outputs from the channel_result
@@ -192,6 +211,7 @@ def main():
     entries = copy.deepcopy(input_dict.get('entries', []))
 
     output_dict = {
+        'states': copy.deepcopy(input_dict.get('states', {})),
         'custom_script_status': 'PENDING',
         'entries': entries
     }
@@ -278,6 +298,9 @@ def main():
             output_dict['custom_script_status'] = 'ERROR'
             write_output_file(output_dict, output_file_abs_path)
             sys.exit(-1)
+
+    # Publish the latest telemetry values as state for downstream steps
+    update_channel_variables(output_dict, entries)
 
     # Determine overall custom_script_status
     statuses = [entry['verification_status'] for entry in entries]

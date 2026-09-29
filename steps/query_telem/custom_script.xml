@@ -20,7 +20,7 @@
                     <enum symbolic="EU"></enum>
             </input_field>
             <input_field description="How to evaluate this telemetry" name="verification_condition" phase="AUTHORING" required="YES" type="VERIFICATION_COND"/>
-            <input_field description="Bitmask (either using hex, binary, or decimal)" name="bitmask" phase="AUTHORING" required="NO" type="STRING"/>
+            <input_field description="Bitmask (either using hex, binary, or decimal)" name="bit_mask" phase="AUTHORING" required="NO" type="STRING"/>
             <input_field description="Bitmask (either using hex, binary, or decimal)" name="bit_op" phase="AUTHORING" required="NO" type="ENUM">
                     <enum symbolic="NONE"></enum>
                     <enum symbolic="AND"></enum>
@@ -50,15 +50,23 @@
             <entry_section>
                 <section_header>
                     <layout_display>
-                        <template template="Query for: {telem_name[1]} and check  "></template>
-                        <layout row="1" column="1" width="10" height="1" align="LEFT"></layout>
+                        <template template="{telem_name[1]}"></template>
+                        <layout row="1" column="1" width="3" height="1" align="LEFT"></layout>
                     </layout_display>
+                    <layout_display>
+                        <template template="{verify_on} ({dn_eu}) and check {telem_eval}"></template>
+                        <layout row="1" column="5" width="3" height="1" align="LEFT"></layout>
+                    </layout_display>
+                    <layout_display>
+                        <template template="Value: {actual_value}"></template>
+                        <layout row="1" column="9" width="2" height="1" align="LEFT"></layout>
+                    </layout_display>                    
                     <icon icon_type="STATUS">
                         <mouseover_display>
                             <mouseover_element field_name="actual_value" display_name="Actual Value"></mouseover_element>
                             <mouseover_element field_name="telem_time" display_name="Time of Measurement"></mouseover_element>
                         </mouseover_display>
-                        <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
+                    <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
                     </icon>
                 </section_header>
                 <section_content>
@@ -86,7 +94,7 @@
                         <label label_content="Bit Operation" label_loc="LEFT" label_align="CENTER"></label>
                         <layout row="4" column="1" width="2" height="1" align="LEFT"></layout>
                     </layout_field>
-                    <layout_field> field_name="bitmask">
+                    <layout_field> field_name="bit_mask">
                         <label label_content="Bitmask" label_loc="LEFT" label_align="CENTER"></label>
                         <layout row="4" column="3" width="3" height="1" align="LEFT"></layout>
                     </layout_field>
