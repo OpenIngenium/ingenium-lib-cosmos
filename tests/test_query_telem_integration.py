@@ -49,7 +49,7 @@ def test_real_query_telem_pipeline_passes(mocker, mock_io):
     assert output['entries'][0]['verification_status'] == 'PASS'
     assert output['entries'][0]['entry_outputs']['actual_value'] == 'INHIBIT'
     assert output['entries'][0]['entry_outputs']['telem_time'] == '2026-01-01T00:00:00Z'
-    assert output['entries'][0]['entry_outputs']['telem_eval'] == '{actual_value} == INHIBIT'
+    assert output['entries'][0]['entry_outputs']['telem_eval'] == 'INHIBIT == INHIBIT'
 
 
 def test_real_pipeline_keeps_prefix_overlapping_packets_separate(mocker, mock_io):
