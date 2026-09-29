@@ -135,8 +135,7 @@ def main():
     output_dict['output_summary'] = f"Halted {outputs['scripts_halted']} out of {outputs['scripts_running']} scripts running"
 
     # Report final custom_script_status
-    final_log = logger.info if custom_script_status == 'PASS' else logger.warning
-    final_log(
+    logger.info(
         f'Final status: {custom_script_status} '
         f'({outputs["scripts_halted"]}/{outputs["scripts_running"]} scripts halted)'
     )

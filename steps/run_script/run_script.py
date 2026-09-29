@@ -108,7 +108,7 @@ def main():
 
         write_output_file(output_dict, output_file_abs_path)
 
-        if wait_for_completion:
+        if wait_for_completion=='true':
             script_details = {}
             result = {}
             try:
@@ -149,7 +149,7 @@ def main():
 
             if result.get('state') in ('completed', 'done'):
                 entry['verification_status'] = 'PASS'
-                logger.info("  ✓ Script execution successful")
+                logger.info("Script execution successful")
             else:
                 entry['verification_status'] = 'FAIL'
                 logger.warning(f"Script execution failed: script_id={script_id} state={result.get('state')}")
