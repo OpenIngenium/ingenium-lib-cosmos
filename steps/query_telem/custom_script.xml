@@ -27,7 +27,8 @@
                     <enum symbolic="OR"></enum>
             </input_field>
             <output_field description="Converts the verification condition result to a string (e.g. EQUAL,3,, to 3={actual_value})" name="telem_eval" type="STRING"/>
-            <output_field description="The actual telemetry value retrieved from COSMOS" name="actual_value" type="STRING"/>
+            <output_field description="This is the value of the telemetry prior to bitmask or on-change evaluation" name="measured_value" type="STRING"/>
+            <output_field description="The actual telemetry value (after bitmask, dn/eu, and channel on change evaluation)" name="actual_value" type="STRING"/>
             <output_field description="The timestamp when the telemetry value was retrieved" name="telem_time" type="STRING"/>
         </script_entry>
         <output_field description="Start time (in DOY format) of the reference time" name="start_time_date_time" type="STRING"/>
@@ -65,6 +66,7 @@
                         <mouseover_display>
                             <mouseover_element field_name="actual_value" display_name="Actual Value"></mouseover_element>
                             <mouseover_element field_name="telem_time" display_name="Time of Measurement"></mouseover_element>
+                            <mouseover_element field_name="measured_value" display_name="Measured Value"></mouseover_element>
                         </mouseover_display>
                     <layout row="1" column="12" width="1" height="1" align="RIGHT"></layout>
                     </icon>
