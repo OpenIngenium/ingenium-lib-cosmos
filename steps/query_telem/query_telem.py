@@ -125,12 +125,12 @@ def build_combined_query(input_dict, entries):
     return query, entry_map
 
 
-def format_verification_condition(verification_conditions):
-    """Translate an Ingenium verification condition into a display expression."""
+def format_verification_condition(verification_conditions, actual_value):
+    """Translate an Ingenium verification condition into a display expression
+    with the actual telemetry value substituted in."""
     translated = translate_verification_conditions(verification_conditions)
     condition = translated['verification_condition']
     values = translated['verification_values']
-    actual_value = '{actual_value}'
 
     operators = {
         'GREATER_THAN': '>',
@@ -169,7 +169,8 @@ def apply_telem_result_to_entry(entry, telem_result):
     entry['entry_outputs']['actual_value'] = telem_result['actual_value']
     entry['entry_outputs']['telem_time'] = telem_details.get('time')
     entry['entry_outputs']['telem_eval'] = format_verification_condition(
-        entry['entry_inputs']['verification_condition']
+        entry['entry_inputs']['verification_condition'],
+        telem_result['actual_value']
     )
 
 

@@ -82,21 +82,21 @@ def find_predict(query_arg, telem_name):
 @pytest.mark.parametrize(
     'verification_condition, expected',
     [
-        ('GREATER_THAN,3,,', '{actual_value} > 3'),
-        ('GREATER_THAN_OR_EQUAL,3,,', '{actual_value} >= 3'),
-        ('LESS_THAN,3,,', '{actual_value} < 3'),
-        ('LESS_THAN_OR_EQUAL,3,,', '{actual_value} <= 3'),
-        ('EQUAL,3,,', '{actual_value} == 3'),
-        ('NOT_EQUAL,3,,', '{actual_value} != 3'),
-        ('CONTAINS,READY,,', 'READY contained in {actual_value}'),
-        ('INCLUSIVE_RANGE,,3,7', '3 <= {actual_value} <= 7'),
-        ('EXCLUSIVE_RANGE,,3,7', '3 < {actual_value} < 7'),
-        ('RECORD,,,', 'Record {actual_value}'),
+        ('GREATER_THAN,3,,', '199 > 3'),
+        ('GREATER_THAN_OR_EQUAL,3,,', '199 >= 3'),
+        ('LESS_THAN,3,,', '199 < 3'),
+        ('LESS_THAN_OR_EQUAL,3,,', '199 <= 3'),
+        ('EQUAL,3,,', '199 == 3'),
+        ('NOT_EQUAL,3,,', '199 != 3'),
+        ('CONTAINS,READY,,', 'READY contained in 199'),
+        ('INCLUSIVE_RANGE,,3,7', '3 <= 199 <= 7'),
+        ('EXCLUSIVE_RANGE,,3,7', '3 < 199 < 7'),
+        ('RECORD,,,', 'Record 199'),
         ('NOT_PRESENT,,,', 'telemetry is not present'),
     ],
 )
 def test_format_verification_condition(verification_condition, expected):
-    assert query_telem.format_verification_condition(verification_condition) == expected
+    assert query_telem.format_verification_condition(verification_condition, 199) == expected
 
 
 def test_apply_telem_result_populates_telem_eval():
@@ -112,7 +112,7 @@ def test_apply_telem_result_populates_telem_eval():
         make_predict_result('TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A', actual_value=4),
     )
 
-    assert entry['entry_outputs']['telem_eval'] == '{actual_value} > 3'
+    assert entry['entry_outputs']['telem_eval'] == '4 > 3'
 
 
 @pytest.fixture(autouse=True)
@@ -180,7 +180,7 @@ class TestMain:
         assert entry['verification_status'] == 'PASS'
         assert entry['entry_outputs']['actual_value'] == 'INHIBIT'
         assert entry['entry_outputs']['telem_time'] == '2026-01-01T00:00:00Z'
-        assert entry['entry_outputs']['telem_eval'] == '{actual_value} == INHIBIT'
+        assert entry['entry_outputs']['telem_eval'] == 'INHIBIT == INHIBIT'
         assert output['custom_script_status'] == 'PASS'
 
     def test_fail_case_sets_fail_status(self, mocker, mock_io):
