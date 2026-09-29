@@ -151,7 +151,7 @@ def format_verification_condition(verification_conditions):
     if condition == 'RECORD':
         return f'Record {actual_value}'
     if condition == 'NOT_PRESENT':
-        return f'telemetry is not present'
+        return 'telemetry is not present'
 
     raise InputError(f'Unknown Verification Condition: {condition}')
 
