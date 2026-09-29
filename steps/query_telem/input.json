@@ -1,10 +1,11 @@
 {
     "states": {
-        "variables": {
-            "channel_variables": {
-                "TARGET__PACKET__TELEMPOINT": 4
-            }
-        }
+        "variables": {},
+        "channel_variables": {
+            "TARGET__PACKET__TELEMPOINT": 4
+        },
+        "manual_input_variables": {},
+        "mil_1553_variables": {}
     },
     "inputs": {
         "start_time": "2026-08-17T22:00:00Z",

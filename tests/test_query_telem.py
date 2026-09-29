@@ -46,14 +46,17 @@ def make_entry(telem_name='TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A',
 
 
 def make_predict_result(telem_name, actual_value='INHIBIT', verification_status='PASS',
-                         telem_time='2026-01-01T00:00:00Z'):
+                         telem_time='2026-01-01T00:00:00Z', telem_details=None):
+    if telem_details is None:
+        telem_details = {'time': telem_time}
+
     return {
         'telem_uuid': telem_name,
         'predict': {},
         'actual_value': actual_value,
         'verification_status': verification_status,
         'data_present': True,
-        'telem_details': {'time': telem_time},
+        'telem_details': telem_details,
     }
 
 
@@ -99,13 +102,19 @@ def test_format_verification_condition(verification_condition, expected):
     assert query_telem.format_verification_condition(verification_condition, 199) == expected
 
 
-def test_apply_telem_result_populates_telem_eval():
-    entry = make_entry(verification_condition='GREATER_THAN,3,,')
+def make_entry_with_outputs(**kwargs):
+    entry = make_entry(**kwargs)
     entry['entry_outputs'] = {
+        'measured_value': '',
         'actual_value': '',
         'telem_time': '',
         'telem_eval': '',
     }
+    return entry
+
+
+def test_apply_telem_result_populates_telem_eval():
+    entry = make_entry_with_outputs(verification_condition='GREATER_THAN,3,,')
 
     query_telem.apply_telem_result_to_entry(
         entry,
@@ -113,6 +122,31 @@ def test_apply_telem_result_populates_telem_eval():
     )
 
     assert entry['entry_outputs']['telem_eval'] == '4 > 3'
+
+
+@pytest.mark.parametrize(
+    'dn_eu, telem_details, expected',
+    [
+        # DN: measured_value is the raw COSMOS value, before the bit mask that
+        # produced actual_value
+        ('DN', {'time': '2026-01-01T00:00:00Z', 'raw_value': 255}, 255),
+        ('EU', {'time': '2026-01-01T00:00:00Z', 'eng_value': 12.5}, 12.5),
+        # No telemetry found (NOT_PRESENT / still pending)
+        ('DN', None, ''),
+    ],
+)
+def test_apply_telem_result_populates_measured_value(dn_eu, telem_details, expected):
+    entry = make_entry_with_outputs(dn_eu=dn_eu, verification_condition='GREATER_THAN,3,,',
+                                    bit_mask='0x0F', bit_op='AND')
+
+    query_telem.apply_telem_result_to_entry(
+        entry,
+        make_predict_result('TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A', actual_value=15,
+                            telem_details=telem_details),
+    )
+
+    assert entry['entry_outputs']['measured_value'] == expected
+    assert entry['entry_outputs']['actual_value'] == 15
 
 
 @pytest.fixture(autouse=True)
@@ -216,7 +250,7 @@ class TestMain:
         output = last_output_dict(mock_io)
         assert output['entries'][0]['verification_status'] == 'ERROR'
         assert output['entries'][1]['verification_status'] == 'ERROR'
-        assert set(output['entries'][0]['entry_outputs']) == {'actual_value', 'telem_time', 'telem_eval'}
+        assert set(output['entries'][0]['entry_outputs']) == {'measured_value', 'actual_value', 'telem_time', 'telem_eval'}
         assert 'bad query' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
@@ -269,13 +303,13 @@ class TestMain:
         output = last_output_dict(mock_io)
         entry = output['entries'][0]
         assert entry['verification_status'] == 'ERROR'
-        assert set(entry['entry_outputs']) == {'actual_value', 'telem_time', 'telem_eval'}
+        assert set(entry['entry_outputs']) == {'measured_value', 'actual_value', 'telem_time', 'telem_eval'}
         assert 'cosmos down' in output['output_summary']
         assert output['custom_script_status'] == 'ERROR'
 
     def test_verify_on_change_passes_prior_value_from_states(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_TWO__FIELD_B'
-        states = {'variables': {'channel_variables': {telem_name: 4}}}
+        states = {'channel_variables': {telem_name: 4}}
         set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE')], states=states)
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
@@ -292,7 +326,7 @@ class TestMain:
 
     def test_verify_on_change_missing_channel_defaults_to_none(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_TWO__FIELD_B'
-        states = {'variables': {'channel_variables': {}}}
+        states = {'channel_variables': {}}
         set_input(mocker, [make_entry(telem_name=telem_name, verify_on='CHANGE')], states=states)
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
@@ -309,7 +343,7 @@ class TestMain:
 
     def test_verify_on_value_ignores_states_channel_variables(self, mocker, mock_io):
         telem_name = 'TESTPKT__GENERIC/CHANNEL_ONE__FIELD_A'
-        states = {'variables': {'channel_variables': {telem_name: 999}}}
+        states = {'channel_variables': {telem_name: 999}}
         set_input(mocker, [make_entry(telem_name=telem_name, verify_on='VALUE')], states=states)
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
@@ -351,7 +385,7 @@ class TestMain:
         set_input(
             mocker,
             [make_entry(telem_name=f'{telem_id},{telem_name}', verify_on='CHANGE')],
-            states={'variables': {'channel_variables': {telem_name: 4}}},
+            states={'channel_variables': {telem_name: 4}},
         )
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(

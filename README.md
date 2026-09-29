@@ -441,11 +441,12 @@ Input shape:
 ```json
 {
   "states": {
-    "variables": {
-      "channel_variables": {
-        "TARGET__PACKET__ITEM": 4
-      }
-    }
+    "variables": {},
+    "channel_variables": {
+      "TARGET__PACKET__ITEM": 4
+    },
+    "manual_input_variables": {},
+    "mil_1553_variables": {}
   },
   "inputs": {
     "start_time": "2026-08-17T22:00:00Z",
@@ -480,7 +481,7 @@ Important fields:
 - `timeout`: verification/query window and request timeout input.
 - `lookback`: historical lookback offset used by the Ingenium verification flow.
 
-The step writes `actual_value` and `telem_time` for every entry while polling. It writes intermediate output snapshots so a long-running `WAIT` operation can be observed. Input errors or telemetry verification failures mark entries as `ERROR` and terminate with overall `ERROR`.
+The step writes `measured_value`, `actual_value`, and `telem_time` for every entry while polling. `measured_value` is the value reported by COSMOS (per the entry's `dn_eu`) before any bit mask or `CHANGE` evaluation; `actual_value` is the value that was evaluated against the verification condition. It writes intermediate output snapshots so a long-running `WAIT` operation can be observed. Input errors or telemetry verification failures mark entries as `ERROR` and terminate with overall `ERROR`.
 
 Once polling completes, the step publishes each entry's latest value to `states.channel_variables`, keyed by canonical telemetry name. Entries that never produced a value leave any existing state entry untouched.
 
@@ -494,7 +495,7 @@ Once polling completes, the step publishes each entry's latest value to `states.
 }
 ```
 
-Note that the prior value used for `verify_on: CHANGE` is read from `states.variables.channel_variables` by `ing_lib.steps.get_telem_prior_value`, which is a different location than where this output is written.
+The prior value used for `verify_on: CHANGE` is read back from this same location by `ing_lib.steps.get_telem_prior_value`.
 
 ### `run_script`
 

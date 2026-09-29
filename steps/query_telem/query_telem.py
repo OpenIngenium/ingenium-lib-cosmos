@@ -24,7 +24,7 @@ from ing_lib.steps import (
 )
 from ing_lib_cosmos.cosmos import (
     CosmosAPIClient, IngeniumCosmosError, cosmos_telemetry_query_func, build_query_dict,
-    validate_dn_eu,
+    validate_dn_eu, VALUE_TYPE_BY_DN_EU,
 )
 
 
@@ -180,11 +180,17 @@ def apply_telem_result_to_entry(entry, telem_result):
     Populate an entry's verification_status/entry_outputs from the channel_result
     returned by verify_wait_telemetry for that entry's channel_name.
 
+    ``measured_value`` is sourced from the raw sample (telem_details), which is
+    the value as reported by COSMOS before any bit mask or CHANGE (prior value)
+    evaluation is applied to produce ``actual_value``.
+
     Updates the entry in place.
     """
     telem_details = telem_result.get('telem_details') or {}
+    value_type = VALUE_TYPE_BY_DN_EU.get(entry['entry_inputs']['dn_eu'])
 
     entry['verification_status'] = telem_result['verification_status']
+    entry['entry_outputs']['measured_value'] = telem_details.get(value_type, '')
     entry['entry_outputs']['actual_value'] = telem_result['actual_value']
     entry['entry_outputs']['telem_time'] = telem_details.get('time')
     entry['entry_outputs']['telem_eval'] = format_verification_condition(
@@ -220,6 +226,7 @@ def main():
     for entry in entries:
         entry['verification_status'] = 'PENDING'
         entry['entry_outputs'] = {
+            'measured_value': '',
             'actual_value': '',
             'telem_time': '',
             'telem_eval': ''
