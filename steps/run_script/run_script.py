@@ -61,7 +61,7 @@ def main():
 
     # Process each script entry
     for i, entry in enumerate(entries):
-        logger.info(f'\nProcessing script {i+1} of {len(entries)}')
+        logger.info(f'Processing script {i+1} of {len(entries)}')
         
         logger.debug(f"Processing script entry: {entry}")
     
@@ -203,7 +203,7 @@ def main():
     output_dict['custom_script_status'] = custom_script_status
 
     # Report final custom_script_status
-    logger.info(f'\nFinal status: {custom_script_status}')
+    logger.info(f'Final status: {custom_script_status}')
     write_output_file(output_dict, output_file_abs_path)
 
 if __name__ == '__main__':
