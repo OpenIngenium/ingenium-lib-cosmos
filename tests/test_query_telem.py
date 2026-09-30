@@ -406,7 +406,7 @@ class TestMain:
         assert f'{telem_name},{telem_id}' not in output['output_summary']
 
     def test_leading_csv_delimiter_is_normalized_for_query(self, mocker, mock_io):
-        telem_name = 'MIRA__PRIM/DEFAULTBEACON__META.PID'
+        telem_name = 'TGT__PACKET__TELEM'
         set_input(mocker, [make_entry(telem_name=f',{telem_name}')])
         mocker.patch.object(query_telem, 'CosmosAPIClient', return_value=mocker.Mock())
         verify_mock = mocker.patch.object(
