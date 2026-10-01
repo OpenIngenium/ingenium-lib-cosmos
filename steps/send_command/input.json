@@ -1,0 +1,28 @@
+{
+    "entries": [
+        {
+            "entry_inputs": {
+                "command_string": "BATMAN__BADCMD with ID 2, VALUE 3.14, BOOL 1, LABEL \"Another Test\"",
+                "cmd_check": "NO_CHECK"
+            }
+        },
+        {
+            "entry_inputs": {
+                "command_string": "AMAZING__CMD with BLAH 2, NINJA 3",
+                "cmd_check": "ENABLED"
+            }
+        },
+        {
+            "entry_inputs": {
+                "command_string": "SAMPLE_PAYLOAD__EXAMPLE with X 1, VALUE -2.5, VALUE2 0, LABEL \"Sample Text\"",
+                "cmd_check": "ENABLED"
+            }
+        },
+        {
+            "entry_inputs": {
+                "command_string": "CMD__ECHO with PAYLOAD \"This is a test\"",
+                "cmd_check": "ENABLED"
+            }
+        }
+    ]
+}
