@@ -1,6 +1,6 @@
 # `ing_lib_cosmos`
 
-`ing_lib_cosmos` is the COSMOS integration layer for OpenIngenium. It provides a typed Python client for OpenC3 COSMOS authentication, JSON-RPC telemetry and command operations, and Script Runner operations. It also ships the custom-script entry points used by Ingenium workflows.
+`ing_lib_cosmos` is the COSMOS integration layer for OpenIngenium. It provides a typed Python client for OpenC3 COSMOS authentication, JSON-RPC telemetry and command operations, and Script Runner operations. It also provides reference implementations of Ingenium steps that use the COSMOS functionality to perform common test operations.
 
 The repository sits between two systems:
 
@@ -80,7 +80,7 @@ Runtime dependencies are:
 
 - `requests>=2.31.0`
 - `urllib3>=1.26.0`
-- `ing_lib @ git+https://github.com/OpenIngenium/ingenium-lib.git@v0.1.0`
+- `ing_lib @ git+https://github.com/OpenIngenium/ingenium-lib.git@v0.1.1`
 
 ---
 
@@ -788,7 +788,7 @@ The command step intentionally waits briefly after dispatch before reading `get_
 
 The package version is currently `0.1.0` in both `setup.py` and `ing_lib_cosmos/__init__.py`.
 
-The `ing_lib` dependency is pinned to the Git tag `v0.1.0` because verification behavior and input/output helpers are part of this package's compatibility surface. Update that pin deliberately and run the complete test suite when changing it.
+The `ing_lib` dependency is pinned to the Git tag `v0.1.1` because verification behavior and input/output helpers are part of this package's compatibility surface. Update that pin deliberately and run the complete test suite when changing it.
 
 The repository does not define console-script entry points. Invoke the step files directly with Python, or register them through the Ingenium custom-script XML configuration.
 
