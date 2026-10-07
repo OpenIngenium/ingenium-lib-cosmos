@@ -36,4 +36,4 @@ jobs:
       - name: Lint
         run: |
           pip install "ruff>=0.6.0"
-          ruff check ing_lib_cosmos steps tests --select F
+          ruff check ing_lib_cosmos tests
