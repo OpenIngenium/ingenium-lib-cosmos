@@ -1,13 +1,19 @@
 # `ing_lib_cosmos`
 
-`ing_lib_cosmos` is the COSMOS integration layer for OpenIngenium. It provides a typed Python client for OpenC3 COSMOS authentication, JSON-RPC telemetry and command operations, and Script Runner operations. It also provides reference implementations of Ingenium steps that use the COSMOS functionality to perform common test operations.
+[![Tests](https://github.com/OpenIngenium/ingenium-lib-cosmos/actions/workflows/tests.yml/badge.svg)](https://github.com/OpenIngenium/ingenium-lib-cosmos/actions/workflows/tests.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+`ing_lib_cosmos` is the COSMOS integration layer for OpenIngenium. It provides a typed Python client for OpenC3 COSMOS authentication, JSON-RPC telemetry and command operations, and Script Runner operations.
 
 The repository sits between two systems:
 
 - **OpenC3 COSMOS**, which supplies command, telemetry, authentication, and Script Runner APIs.
 - **Ingenium**, which supplies custom-script input/output conventions and reusable verification behavior through the pinned `ing_lib` dependency.
 
-This README is intended to be a standalone, wiki-style reference for installing, configuring, using, extending, and troubleshooting the repository.
+Ingenium custom-script steps built on this library live in the separate [`reference`](https://github.com/OpenIngenium/reference) repository, under `steps/cosmos/`. This repository stays focused on library code.
+
+This README is intended to be a standalone, wiki-style reference for installing, configuring, using, extending, and troubleshooting the library.
 
 ---
 
@@ -19,8 +25,6 @@ This README is intended to be a standalone, wiki-style reference for installing,
 - [Configuration](#configuration)
 - [Authentication](#authentication)
 - [Python client API](#python-client-api)
-- [Custom-script contract](#custom-script-contract)
-- [Built-in custom-script steps](#built-in-custom-script-steps)
 - [Telemetry verification model](#telemetry-verification-model)
 - [Error handling](#error-handling)
 - [Logging](#logging)
@@ -35,8 +39,6 @@ This README is intended to be a standalone, wiki-style reference for installing,
 
 ## What is included
 
-### Core library
-
 The `ing_lib_cosmos.cosmos` module contains:
 
 - `CosmosAuth`, including Enterprise and Core authentication modes.
@@ -44,24 +46,6 @@ The `ing_lib_cosmos.cosmos` module contains:
 - Typed exception classes for transport, authentication, JSON-RPC, and Script Runner failures.
 - Telemetry adapters that translate COSMOS historical telemetry into the interface expected by `ing_lib.steps.verify_wait_telemetry`.
 - Helpers for validating and constructing Ingenium telemetry queries.
-
-### Ingenium custom-script steps
-
-Each step is an executable Python script that accepts an input JSON path and an output JSON path:
-
-| Step | Purpose |
-| --- | --- |
-| `send_command` | Send one or more COSMOS commands and record command count/time. |
-| `query_telem` | Query current/historical telemetry and evaluate Ingenium verification conditions. |
-| `run_script` | Start a COSMOS Script Runner script and optionally wait for completion. |
-| `halt_all_scripts` | Find all running COSMOS scripts and attempt to stop each one. |
-
-Each step directory also contains:
-
-- `custom_script.xml`: Ingenium website/custom-script declaration.
-- `input.json`: example input shape.
-- `output.json`: example output shape.
-- The step implementation itself.
 
 ---
 
@@ -362,199 +346,6 @@ A `401` or `403` invalidates the cached token for the next request but is not au
 
 ---
 
-## Custom-script contract
-
-All four entry points follow the Ingenium custom-script convention:
-
-```sh
-python steps/<step>/<step>.py input.json output.json
-```
-
-The scripts:
-
-1. Read the input JSON path from the command line.
-2. Create and initialize the output JSON file with a pending status.
-3. Create a `CosmosAPIClient` using environment configuration.
-4. Update output as work progresses, where supported.
-5. Write a final `custom_script_status`.
-
-The common top-level statuses are:
-
-- `PENDING`: output was initialized but work is not complete.
-- `PASS`: all entries or requested operations succeeded.
-- `FAIL`: at least one operation completed but did not meet its success criteria.
-- `ERROR`: setup, input, authentication, transport, or other fatal processing error prevented normal verification.
-
-Per-entry `verification_status` values generally use `PENDING`, `PASS`, `FAIL`, or `ERROR`.
-
-Input and output files are ordinary JSON. The XML files describe the fields and UI layout consumed by Ingenium; they do not replace the JSON files used by the executable scripts.
-
----
-
-## Built-in custom-script steps
-
-### `send_command`
-
-Run it with:
-
-```sh
-python steps/send_command/send_command.py input.json output.json
-```
-
-Input shape:
-
-```json
-{
-  "entries": [
-    {
-      "entry_inputs": {
-        "command_string": "TARGET__COMMAND with ARG 42, LABEL \"Example\"",
-        "cmd_check": "ENABLED"
-      }
-    }
-  ]
-}
-```
-
-The Ingenium-facing `TARGET__COMMAND` form is converted to COSMOS's `TARGET COMMAND` form. Arguments following `with` are preserved.
-
-For each entry, the step:
-
-1. Parses and validates the command string.
-2. Sends the command.
-3. Waits briefly for COSMOS command counters to update.
-4. Reads command count and most recent command time.
-5. Writes `cmd_status`, `cmd_cnt`, and an ISO-8601 `timestamp`.
-
-A failed command gets `cmd_status: "fail"`, `cmd_cnt: 0`, and `timestamp: "N/A"`. The overall status is `FAIL` if any entry fails.
-
-### `query_telem`
-
-Run it with:
-
-```sh
-python steps/query_telem/query_telem.py input.json output.json
-```
-
-Input shape:
-
-```json
-{
-  "states": {
-    "variables": {},
-    "channel_variables": {
-      "TARGET__PACKET__ITEM": 4
-    },
-    "manual_input_variables": {},
-    "mil_1553_variables": {}
-  },
-  "inputs": {
-    "start_time": "2026-08-17T22:00:00Z",
-    "timeout": 600,
-    "lookback": 10
-  },
-  "entries": [
-    {
-      "entry_inputs": {
-        "telem_name": "TARGET__PACKET__ITEM",
-        "verify_wait": "WAIT",
-        "verify_on": "VALUE",
-        "dn_eu": "EU",
-        "verification_condition": "EQUAL,4,,",
-        "bit_mask": null,
-        "bit_op": null
-      }
-    }
-  ]
-}
-```
-
-Important fields:
-
-- `telem_name`: canonical `TARGET__PACKET__TELEMPOINT`; an optional comma-separated telemetry ID may be present in platform input, but only the name is used to build the COSMOS query.
-- `verify_wait`: controls whether the verification checks available data or waits for a matching value, according to the `ing_lib` verification implementation. The XML exposes `WAIT` and `VERIFY`.
-- `verify_on`: `VALUE` evaluates the queried value; `CHANGE` compares against the prior Ingenium channel value.
-- `dn_eu`: `DN` requests the raw value; `EU` requests the converted engineering value.
-- `verification_condition`: Ingenium verification condition string, translated by `ing_lib`.
-- `bit_mask` and `bit_op`: optional bitwise verification settings.
-- `start_time`: optional reference time. The step parser currently expects day-of-year format `YYYY-DDDTHH:MM:SS`, for example `2026-266T21:24:01`; an empty value means no explicit reference time. The checked-in JSON fixture uses an ISO-style value, so deployments should use the format accepted by the installed step implementation or update the fixture and platform mapping together.
-- `timeout`: verification/query window and request timeout input.
-- `lookback`: historical lookback offset used by the Ingenium verification flow.
-
-The step writes `measured_value`, `actual_value`, and `telem_time` for every entry while polling. `measured_value` is the value reported by COSMOS (per the entry's `dn_eu`) before any bit mask or `CHANGE` evaluation; `actual_value` is the value that was evaluated against the verification condition. It writes intermediate output snapshots so a long-running `WAIT` operation can be observed. Input errors or telemetry verification failures mark entries as `ERROR` and terminate with overall `ERROR`.
-
-Once polling completes, the step publishes each entry's latest value to `states.channel_variables`, keyed by canonical telemetry name. Entries that never produced a value leave any existing state entry untouched.
-
-```json
-{
-  "states": {
-    "channel_variables": {
-      "TARGET__PACKET__ITEM": 4
-    }
-  }
-}
-```
-
-The prior value used for `verify_on: CHANGE` is read back from this same location by `ing_lib.steps.get_telem_prior_value`.
-
-### `run_script`
-
-Run it with:
-
-```sh
-python steps/run_script/run_script.py input.json output.json
-```
-
-Input shape:
-
-```json
-{
-  "entries": [
-    {
-      "entry_inputs": {
-        "script_name": "TARGET/procedures/example.py",
-        "wait_for_completion": true,
-        "timeout": 300
-      }
-    }
-  ]
-}
-```
-
-Behavior:
-
-- `script_name` is passed to `start_script()` and must be a relative COSMOS script path.
-- `wait_for_completion: true` polls until a terminal state. A completed/done state is `PASS`; an error, stopped, not-found, or timeout outcome is `FAIL`.
-- `wait_for_completion: false` returns after starting and checking the script. A script found by COSMOS is `PASS`, even if it is still running.
-- `timeout` defaults to `DEFAULT_SCRIPT_TIMEOUT` (300 seconds) when omitted or falsey.
-
-Output fields include the script ID, running state, COSMOS state, line numbers, timestamps, timeout remaining, and any error text returned by Script Runner.
-
-### `halt_all_scripts`
-
-Run it with:
-
-```sh
-python steps/halt_all_scripts/halt_all_scripts.py input.json output.json
-```
-
-The input is currently unused; an empty JSON object is sufficient:
-
-```json
-{}
-```
-
-The step lists running scripts using `SCRIPT_FILTER_RUNNING`, attempts to stop each one, and reports:
-
-- `scripts_running`: number found at the start of the operation.
-- `scripts_halted`: number successfully stopped.
-- `output_array`: per-script details, including ID, state, filename, line number, start time, and last update.
-- `output_summary`: a human-readable count summary.
-
-The step returns `PASS` only when every discovered script is successfully halted. If no scripts are running, the counts are zero and the operation is successful.
-
----
-
 ## Telemetry verification model
 
 The telemetry helpers bridge two data models:
@@ -667,14 +458,14 @@ python -m pip install -r requirements-dev.txt
 python -m pip install -e .
 ```
 
-The codebase uses straightforward Python modules and executable step scripts. When changing behavior:
+When changing behavior:
 
-1. Trace the client or step flow before editing.
+1. Trace the client flow before editing.
 2. Add or update a focused test in `tests/`.
-3. Preserve the input/output contract and intermediate output behavior.
+3. Preserve the public API surface consumed by downstream steps.
 4. Run the complete test and lint commands before submitting a change.
 
-The tests mock HTTP responses and do not require a live COSMOS server. The integration-named telemetry test verifies adapter behavior using mocked client calls; it is not a substitute for a live-system smoke test.
+The tests mock HTTP responses and do not require a live COSMOS server.
 
 ---
 
@@ -690,7 +481,7 @@ Run the same focused lint used by CI:
 
 ```sh
 python -m pip install 'ruff>=0.6.0'
-ruff check ing_lib_cosmos steps tests --select F
+ruff check ing_lib_cosmos tests
 ```
 
 GitHub Actions runs tests on Python 3.10, 3.11, 3.12, 3.13, and 3.14. Pull requests and pushes to `main` install the pinned Ingenium library, install this package, run pytest with coverage, and run Ruff's `F` checks.
@@ -702,7 +493,6 @@ Tests cover:
 - Command and telemetry API payloads.
 - Script lifecycle operations and timeout handling.
 - Telemetry query construction and DN/EU behavior.
-- Custom-script input/output and status handling.
 
 ---
 
@@ -744,7 +534,7 @@ Check all of the following:
 
 ### Command count or timestamp appears unchanged
 
-The command step intentionally waits briefly after dispatch before reading `get_cmd_cnt()` and `get_cmd_time()`. If the server still processes commands asynchronously, verify the command result and COSMOS command history independently.
+COSMOS updates its command counters asynchronously, so `get_cmd_cnt()` and `get_cmd_time()` can lag a `send_command()` call. Wait briefly before reading them, and verify the command result and COSMOS command history independently.
 
 ---
 
@@ -756,7 +546,7 @@ The command step intentionally waits briefly after dispatch before reading `get_
 - Treat `NO_CHECK` as an intentional operational choice. Prefer `ENABLED` for normal command execution when COSMOS command validation is available.
 - Review command and Script Runner inputs before executing them against a flight or production system.
 - Be cautious when retrying commands or script starts: the client avoids automatic retries for authenticated requests because repeating a non-idempotent operation can have side effects.
-- `halt_all_scripts` affects every running script in the configured COSMOS scope. Use it only when that broad action is intended.
+- `get_all_scripts()` and `halt_script()` operate within the configured COSMOS scope. Halting every script returned by `SCRIPT_FILTER_RUNNING` is a broad action; use it only when that is intended.
 
 ---
 
@@ -767,20 +557,17 @@ The command step intentionally waits briefly after dispatch before reading `get_
 ├── ing_lib_cosmos/
 │   ├── __init__.py
 │   └── cosmos.py
-├── steps/
-│   ├── send_command/
-│   ├── query_telem/
-│   ├── run_script/
-│   └── halt_all_scripts/
 ├── tests/
 ├── cosmos_env.sh
+├── pytest.ini
+├── ruff.toml
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── setup.py
 └── .github/workflows/tests.yml
 ```
 
-`cosmos.py` is intentionally the central integration module. The step scripts are thin orchestration layers that translate Ingenium JSON into client calls and back into the expected output structure.
+`cosmos.py` is intentionally the central integration module: every COSMOS operation, exception type, and telemetry adapter lives there.
 
 ---
 
@@ -790,7 +577,7 @@ The package version is currently `0.1.0` in both `setup.py` and `ing_lib_cosmos/
 
 The `ing_lib` dependency is pinned to the Git tag `v0.1.1` because verification behavior and input/output helpers are part of this package's compatibility surface. Update that pin deliberately and run the complete test suite when changing it.
 
-The repository does not define console-script entry points. Invoke the step files directly with Python, or register them through the Ingenium custom-script XML configuration.
+The repository does not define console-script entry points; it is consumed as a library. Ingenium custom scripts that depend on it pin it by tag, as the [`reference`](https://github.com/OpenIngenium/reference) repository does in `steps/cosmos/requirements.txt`.
 
 ---
 
