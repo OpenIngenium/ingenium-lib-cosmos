@@ -56,7 +56,7 @@ The `ing_lib_cosmos.cosmos` module contains:
 - A COSMOS scope, such as `DEFAULT`.
 - Credentials appropriate for the selected authentication mode.
 - Network access to the COSMOS base URL.
-- The `ing_lib` package from the OpenIngenium repository. This repository currently pins it to tag `v0.1.1`.
+- The `ing_lib` package from the OpenIngenium repository, published on PyPI as `ingenium-lib`.
 
 The package metadata advertises Python 3.10 through 3.14. CI tests the same versions.
 
@@ -64,11 +64,17 @@ Runtime dependencies are:
 
 - `requests>=2.31.0`
 - `urllib3>=1.26.0`
-- `ing_lib @ git+https://github.com/OpenIngenium/ingenium-lib.git@v0.1.1`
+- `ingenium-lib>=0.1.2`
 
 ---
 
 ## Installation
+
+The package is published on PyPI as `ingenium-lib-cosmos` (import name `ing_lib_cosmos`):
+
+```sh
+python -m pip install ingenium-lib-cosmos
+```
 
 ### Install from a checkout
 
@@ -563,8 +569,8 @@ COSMOS updates its command counters asynchronously, so `get_cmd_cnt()` and `get_
 ├── ruff.toml
 ├── requirements.txt
 ├── requirements-dev.txt
-├── setup.py
-└── .github/workflows/tests.yml
+├── pyproject.toml
+└── .github/workflows/ (tests.yml, publish.yml)
 ```
 
 `cosmos.py` is intentionally the central integration module: every COSMOS operation, exception type, and telemetry adapter lives there.
@@ -573,9 +579,9 @@ COSMOS updates its command counters asynchronously, so `get_cmd_cnt()` and `get_
 
 ## Versioning and dependency pinning
 
-The package version is currently `0.1.0` in both `setup.py` and `ing_lib_cosmos/__init__.py`.
+The package version is currently `0.1.1` in `ing_lib_cosmos/__init__.py`; `pyproject.toml` reads it dynamically when building distributions. Bump `__init__.py` before cutting a release — PyPI rejects re-uploads of an existing version.
 
-The `ing_lib` dependency is pinned to the Git tag `v0.1.1` because verification behavior and input/output helpers are part of this package's compatibility surface. Update that pin deliberately and run the complete test suite when changing it.
+The `ingenium-lib` dependency is pinned to `>=0.1.2` because verification behavior and input/output helpers are part of this package's compatibility surface. Update that pin deliberately and run the complete test suite when changing it.
 
 The repository does not define console-script entry points; it is consumed as a library. Ingenium custom scripts that depend on it pin it by tag, as the [`reference`](https://github.com/OpenIngenium/reference) repository does in `steps/cosmos/requirements.txt`.
 

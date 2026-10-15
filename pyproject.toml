@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ingenium-lib-cosmos"
+dynamic = ["version"]
+description = "Python libraries supporting OpenIngenium and COSMOS"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [
+    {name = "Christopher Swan", email = "open-ingenium@jpl.nasa.gov"},
+]
+keywords = ["ingenium", "open-ingenium", "cosmos"]
+dependencies = [
+    "requests>=2.31.0",
+    "urllib3>=1.26.0",
+    "ingenium-lib>=0.1.2",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+[project.urls]
+Homepage = "https://github.com/OpenIngenium/ingenium-lib-cosmos"
+Source = "https://github.com/OpenIngenium/ingenium-lib-cosmos"
+Issues = "https://github.com/OpenIngenium/ingenium-lib-cosmos/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "ing_lib_cosmos.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["ing_lib_cosmos*"]
